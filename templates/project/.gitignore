@@ -1,0 +1,5 @@
+/bin/
+/tmp/
+*.out
+.env
+node_modules/

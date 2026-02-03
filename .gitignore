@@ -1,0 +1,13 @@
+# Build artifacts
+/bin/
+/tmp/
+*.out
+/ix          # the CLI binary, if built into the repo root
+
+# Go workspace sum (keep go.work, ignore the local sum)
+go.work.sum
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/

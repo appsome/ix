@@ -1,0 +1,42 @@
+# {{.Module}}
+
+Scaffolded with [ix](https://github.com/appsome/ix).
+
+## Develop
+
+```sh
+cp .env.example .env
+ix generate            # sqlc + gqlgen codegen from your schema
+ix migrate new <name>  # diff schema.sql into a versioned Atlas migration
+ix add <block>         # vendor a building block (authz, auth-jwt, helm, …)
+```
+
+The desired database schema lives in `internal/datastore/schema.sql` — edit it,
+then regenerate. See `ix list` for available blocks and `ix.yaml` for project
+configuration.
+{{- if .PostGIS }}
+
+### PostGIS extension
+
+The schema uses PostGIS `geometry` types, but **`schema.sql` does not declare
+the extension** and no migration creates it. This is deliberate: Atlas's
+open-source CLI cannot diff PostgreSQL extensions (extension support is an
+[Atlas Pro feature](https://atlasgo.io/features)), so a `CREATE EXTENSION`
+statement in `schema.sql` would make `ix migrate new` fail with
+`requires 'atlas login'`. PostGIS must therefore be installed **out of band**:
+
+- **Local dev** — handled for you. `atlas.hcl` points the migration dev
+  database at the multi-arch `imresamu/postgis` image (the official
+  `postgis/postgis` image has no arm64 build), so `geometry` types resolve
+  during diffing without managing the extension.
+- **Staging / production** — install PostGIS once, before applying migrations,
+  as a privileged bootstrap step:
+
+  ```sql
+  CREATE EXTENSION IF NOT EXISTS postgis;
+  ```
+
+  Run this via your provisioning/IaC tooling or a DBA. Managed Postgres
+  (RDS, Cloud SQL, Supabase, …) ships the PostGIS binaries; you still issue the
+  `CREATE EXTENSION` once per database. Migrations assume it is already present.
+{{- end }}

@@ -1,0 +1,10 @@
+// Local development workspace tying the CLI module to the runtime submodule so
+// edits in ./runtime are picked up by the CLI without a published tag.
+// Released projects depend on the tagged runtime module, not this workspace.
+// The reference example uses a replace directive instead (see examples/reference/go.mod).
+go 1.25.0
+
+use (
+	.
+	./runtime
+)
