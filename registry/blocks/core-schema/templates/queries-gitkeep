@@ -1,0 +1,2 @@
+# sqlc reads *.sql query files from this directory. Add one per entity,
+# e.g. internal/datastore/queries/product.sql, then run `ix generate`.

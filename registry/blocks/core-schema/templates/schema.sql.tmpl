@@ -1,0 +1,16 @@
+-- Desired database schema for {{.Module}} — the single source of truth.
+-- Edit this file, then run `ix migrate new <name>` to have Atlas diff it into a
+-- versioned migration, and `ix generate` to regenerate the sqlc bindings.
+--
+-- Atlas manages the schema declaratively: add tables/columns/enums here rather
+-- than hand-writing migrations.
+
+CREATE SCHEMA IF NOT EXISTS "public";
+{{- if .PostGIS }}
+
+-- PostGIS (enabled because database.postgis = true in ix.yaml) is provided by
+-- the dev database image (see atlas.hcl) and must be installed out of band in
+-- the target database. The extension is intentionally NOT declared here:
+-- Atlas's open-source CLI cannot diff extensions (it is a Pro-only feature),
+-- so a `CREATE EXTENSION` statement would break `ix migrate new`.
+{{- end }}

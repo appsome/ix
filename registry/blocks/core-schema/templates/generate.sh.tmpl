@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Run all code generators in dependency order:
+#   1. sqlc   — Go db bindings from schema.sql + queries/
+#   2. gqlgen — GraphQL server scaffolding from the graphql schema
+#
+# Re-running with unchanged inputs must be a no-op (no diff drift); CI relies on
+# that to detect missing checked-in generated files. Managed by ix (core-schema).
+set -euo pipefail
+
+sqlc generate
+go run github.com/99designs/gqlgen generate

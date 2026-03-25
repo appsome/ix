@@ -1,0 +1,21 @@
+env "local" {
+  src = "file://internal/datastore/schema.sql"
+{{- if .PostGIS }}
+  // PostGIS dev image: it ships the extension pre-installed, so the schema's
+  // geometry types resolve during diffing. We use the multi-arch imresamu
+  // mirror because the official postgis/postgis image has no arm64 build, and
+  // reference it pre-installed (rather than a `baseline = CREATE EXTENSION`)
+  // because explicit extension management is an Atlas Pro-only feature.
+  dev = "docker+postgres://_/imresamu/postgis:16-3.5/dev?search_path=public"
+{{- else }}
+  dev = "docker://postgres/15/dev?search_path=public"
+{{- end }}
+  migration {
+    dir = "file://migrations"
+  }
+  format {
+    migrate {
+      diff = "{{ "{{ sql . \\\"  \\\" }}" }}"
+    }
+  }
+}

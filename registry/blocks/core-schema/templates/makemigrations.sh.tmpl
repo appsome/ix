@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Generate a new Atlas migration by diffing internal/datastore/schema.sql
+# against the current migration history. Managed by ix (core-schema).
+set -euo pipefail
+
+read -r -p "Name of migration: " NAME
+FORMATTED_NAME=$(echo "$NAME" | tr '[:upper:]' '[:lower:]' | tr ' ' '_')
+
+atlas migrate diff "$FORMATTED_NAME" --env local

@@ -1,0 +1,25 @@
+# The pipeline spine (docs/DESIGN.md §8). Vendors the single source of truth
+# (schema.sql) and the configs that turn it into migrations + Go bindings.
+# PostGIS bits are conditional on {{.PostGIS}} from ix.yaml.
+name: core-schema
+version: 0.1.0
+category: codegen
+summary: "Schema-first pipeline: schema.sql + sqlc.yaml + atlas.hcl + generate scripts."
+
+vars:
+  - { name: Module,  from: module }
+  - { name: PostGIS, from: database.postgis }
+
+files:
+  - { src: schema.sql.tmpl,           dest: internal/datastore/schema.sql, once: true }
+  - { src: sqlc.yaml.tmpl,            dest: sqlc.yaml }
+  - { src: atlas.hcl.tmpl,            dest: atlas.hcl }
+  - { src: generate.sh.tmpl,          dest: scripts/generate.sh }
+  - { src: makemigrations.sh.tmpl,    dest: scripts/makemigrations.sh }
+  - { src: queries-gitkeep,           dest: internal/datastore/queries/.gitkeep }
+  # PostGIS projects: the geom package sqlc binds geometry columns to.
+  - { src: geom.go.tmpl,              dest: internal/datastore/pkg/geom/geom.go, when: PostGIS }
+
+hooks:
+  post_add:
+    - "chmod +x scripts/generate.sh scripts/makemigrations.sh"
