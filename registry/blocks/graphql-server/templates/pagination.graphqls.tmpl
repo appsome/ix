@@ -1,0 +1,14 @@
+# Relay-style cursor pagination types shared by generated entity connections.
+# Managed by the graphql-server block.
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+input PageArgs {
+  first: Int
+  after: String
+}

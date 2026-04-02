@@ -1,0 +1,17 @@
+# Base GraphQL schema for {{.Module}}. gqlgen needs at least one Query field;
+# `ix add entity --name <x>` extends Query/Mutation with per-entity operations
+# in their own *.graphqls files.
+#
+# ID is a built-in GraphQL scalar — it must NOT be redeclared here (gqlgen
+# errors with "Cannot redeclare type ID"). Its Go binding is overridden in
+# gqlgen.yml via the `models:` map, which does not require a scalar declaration.
+
+type Query {
+  "Liveness probe resolvable without the database."
+  health: String!
+}
+
+type Mutation {
+  "Placeholder mutation so the type is non-empty; replace as entities are added."
+  noop: Boolean!
+}

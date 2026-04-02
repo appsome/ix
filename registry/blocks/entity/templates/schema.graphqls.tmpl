@@ -1,0 +1,19 @@
+# GraphQL schema for the {{.NamePascal}} entity ({{.Module}}).
+# Binds to the sqlc db.{{.NamePascal}} struct via gqlgen autobind where fields
+# match; edit freely as the table grows.
+
+type {{.NamePascal}} {
+  id: ID!
+  name: String!
+}
+
+extend type Query {
+  {{.NameCamel}}(id: ID!): {{.NamePascal}}
+  {{.NamePluralCamel}}(first: Int = 50, offset: Int = 0): [{{.NamePascal}}!]!
+}
+
+extend type Mutation {
+  create{{.NamePascal}}(name: String!): {{.NamePascal}}!
+  update{{.NamePascal}}(id: ID!, name: String!): {{.NamePascal}}!
+  delete{{.NamePascal}}(id: ID!): Boolean!
+}

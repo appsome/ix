@@ -1,0 +1,39 @@
+# The entity generator — ix's headline feature. Invoked repeatedly with
+# parameters: `ix add entity --name product [--frontend]`.
+#
+# It scaffolds the schema-first slice of an entity:
+#   queries/<name>.sql            sqlc CRUD queries
+#   datastore/pkg/<name>/         repository wrapper over the sqlc Queries
+#   api/schema/<name>.graphqls    GraphQL type + queries/mutations
+#   [web/...]                     SvelteKit list/show pages (with --frontend)
+#
+# It deliberately does NOT write resolver .go files: `ix generate` runs gqlgen,
+# which scaffolds the resolver stubs in internal/api/resolver — fill those in,
+# reaching the DB through the generated repository. Generated files are
+# render-once (yours to edit); re-running leaves existing files untouched.
+name: entity
+version: 0.1.0
+category: generator
+summary: "Scaffold a schema-first slice (queries + repository + graphqls [+ frontend])."
+
+requires:
+  - core-schema
+  - graphql-server
+
+# Parameters come from the command line, not ix.yaml. The CLI derives the
+# Name* inflection vars from --name (snake_case singular):
+#   --name <singular>   e.g. product            (required)
+#   --frontend          also emit the SvelteKit CRUD pages
+vars:
+  - { name: Module, from: module }
+
+files:
+  - { src: query.sql.tmpl,       dest: "internal/datastore/queries/{{.Name}}.sql", once: true }
+  - { src: repository.go.tmpl,   dest: "internal/datastore/pkg/{{.Name}}/repository.go", once: true }
+  - { src: schema.graphqls.tmpl, dest: "internal/api/schema/{{.Name}}.graphqls", once: true }
+  - { src: list.svelte.tmpl,     dest: "web/src/routes/(admin)/{{.NamePlural}}/+page.svelte", when: Frontend, once: true }
+  - { src: show.svelte.tmpl,     dest: "web/src/routes/(admin)/{{.NamePlural}}/[id]/+page.svelte", when: Frontend, once: true }
+
+hooks:
+  post_add:
+    - "echo 'Next: add the {{.NamePlural}} table to internal/datastore/schema.sql, then: ix migrate new add_{{.NamePlural}} && ix generate'"

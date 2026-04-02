@@ -1,0 +1,56 @@
+// Command api is the {{.Module}} HTTP/GraphQL server.
+//
+// Owned by the graphql-server block. Runtime-glue blocks (authz, auth-jwt,
+// metrics, …) inject their service construction at the wire-services anchor
+// inside main(), where these locals are in scope:
+//
+//	shutdownCtx context.Context — cancelled on SIGINT/SIGTERM
+//	database    *sql.DB         — the open Postgres pool
+//	dsn         string          — the Postgres connection string
+package main
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+
+	_ "github.com/lib/pq"
+
+	"{{.Module}}/internal/api/server"
+)
+
+func main() {
+	dsn := fmt.Sprintf(
+		"postgres://%s:%s@%s/%s?sslmode=%s",
+		os.Getenv("DB_USER"), os.Getenv("DB_PASS"), os.Getenv("DB_HOST"),
+		os.Getenv("DB_NAME"), getenv("SSL_MODE", "disable"),
+	)
+	database, err := sql.Open("postgres", dsn)
+	if err != nil {
+		log.Fatalf("db open: %v", err)
+	}
+	defer func() { _ = database.Close() }()
+
+	shutdownCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// ix:wire-services
+
+	srv := server.New(database)
+	port := getenv("REST_PORT", "8080")
+	log.Printf("%s api listening on :%s", "{{.Module}}", port)
+	if err := srv.Start(shutdownCtx, port); err != nil {
+		log.Fatalf("server: %v", err)
+	}
+}
+
+func getenv(key, fallback string) string {
+	if v, ok := os.LookupEnv(key); ok {
+		return v
+	}
+	return fallback
+}

@@ -1,0 +1,22 @@
+// Package graphql holds cursor pagination helpers shared by the generated
+// entity resolvers for {{.Module}}.
+package graphql
+
+import (
+	"encoding/base64"
+	"strconv"
+)
+
+// EncodeCursor encodes an int64 id as an opaque base64 cursor.
+func EncodeCursor(id int64) string {
+	return base64.StdEncoding.EncodeToString([]byte(strconv.FormatInt(id, 10)))
+}
+
+// DecodeCursor decodes a cursor produced by EncodeCursor back to an int64 id.
+func DecodeCursor(cursor string) (int64, error) {
+	raw, err := base64.StdEncoding.DecodeString(cursor)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseInt(string(raw), 10, 64)
+}

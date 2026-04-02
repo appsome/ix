@@ -1,0 +1,8 @@
+//go:build tools
+
+// Package tools pins the gqlgen code generator as a module dependency so
+// `go run github.com/99designs/gqlgen generate` (via `ix generate`) resolves a
+// consistent version for {{.Module}}.
+package tools
+
+import _ "github.com/99designs/gqlgen"

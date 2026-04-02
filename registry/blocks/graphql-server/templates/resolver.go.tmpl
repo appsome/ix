@@ -1,0 +1,23 @@
+// Package resolver holds the GraphQL resolver root for {{.Module}}.
+//
+// gqlgen generates per-schema resolver files (<name>.go) alongside this root on
+// `ix generate`; fill in the generated stubs, reaching the database through the
+// sqlc Queries on Resolver. This root file is written once and is yours to edit.
+package resolver
+
+import (
+	"database/sql"
+
+	"{{.Module}}/internal/datastore/pkg/db"
+)
+
+// Resolver is the dependency container handed to every generated resolver. Add
+// fields here (auth service, pubsub broker, …) and thread them in via New.
+type Resolver struct {
+	DB *db.Queries
+}
+
+// New constructs the resolver root from the database handle.
+func New(database *sql.DB) *Resolver {
+	return &Resolver{DB: db.New(database)}
+}

@@ -1,0 +1,27 @@
+schema:
+  - internal/api/schema/*.graphqls
+
+exec:
+  filename: internal/api/generated/exec.go
+  package: generated
+
+model:
+  filename: internal/api/generated/model.go
+  package: generated
+
+resolver:
+  layout: follow-schema
+  dir: internal/api/resolver
+  package: resolver
+  filename_template: "{name}.go"
+
+omit_slice_element_pointers: true
+
+# Bind GraphQL types to the sqlc-generated db structs where names match;
+# otherwise gqlgen generates the model.
+autobind:
+  - "{{.Module}}/internal/datastore/pkg/db"
+
+models:
+  ID:
+    model: github.com/99designs/gqlgen/graphql.Int64

@@ -1,0 +1,36 @@
+# The HTTP/GraphQL server scaffold (docs/DESIGN.md §8). Owns cmd/api/main.go —
+# including the `// ix:wire-services` anchor that runtime-glue blocks patch into
+# — plus the chi router, the gqlgen config, a base schema, and the resolver
+# root. Intentionally runtime-free (chi + gqlgen + database/sql only) so the
+# core pipeline builds without the ix/runtime module; glue blocks add that.
+name: graphql-server
+version: 0.1.0
+category: codegen
+summary: chi HTTP server + gqlgen scaffold + connection/pagination helpers.
+
+requires:
+  - core-schema
+
+vars:
+  - { name: Module, from: module }
+
+files:
+  - { src: gqlgen.yml.tmpl,       dest: gqlgen.yml }
+  - { src: main.go.tmpl,          dest: cmd/api/main.go, once: true }
+  - { src: server.go.tmpl,        dest: internal/api/server/server.go }
+  - { src: resolver.go.tmpl,      dest: internal/api/resolver/resolver.go, once: true }
+  - { src: schema.graphqls.tmpl,  dest: internal/api/schema/schema.graphqls, once: true }
+  - { src: pagination.graphqls.tmpl, dest: internal/api/schema/pagination.graphqls }
+  - { src: pagination.go.tmpl,    dest: internal/api/graphql/pagination.go }
+  - { src: tools.go.tmpl,         dest: internal/tools/tools.go }
+
+hooks:
+  post_add:
+    # The scaffolded files import chi (server) and gqlgen (server + tools.go),
+    # but those are external modules — add them to go.mod here so `ix generate`
+    # and `go build` resolve. `go mod tidy` alone cannot: tools.go is behind a
+    # `//go:build tools` tag, and the generated internal/api/generated package
+    # does not exist until `ix generate` runs, so tidy would fail first.
+    - "go get github.com/99designs/gqlgen"
+    - "go get github.com/go-chi/chi/v5"
+    - "echo 'Next: edit internal/datastore/schema.sql + internal/api/schema/*.graphqls, then run: ix generate'"
