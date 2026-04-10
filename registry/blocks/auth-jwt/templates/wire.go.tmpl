@@ -1,0 +1,49 @@
+// Package auth vendors the project-side wiring for ix's JWT authentication
+// block. The token issue/validate, claims, and password logic live in the
+// imported runtime module; this file is the single place to customize how the
+// TokenService is constructed for {{.Module}} and re-exports the runtime types
+// the rest of the project references, so callers import this one package rather
+// than reaching into the runtime module directly.
+package auth
+
+import (
+	"net/http"
+	"os"
+
+	runtimeauth "github.com/appsome/ix/runtime/auth"
+	runtimemw "github.com/appsome/ix/runtime/middleware"
+)
+
+// NewTokenService builds the HS256 token service from the JWT_SECRET
+// environment variable. Override the durations on the returned service if the
+// 15m access / 7d refresh defaults do not suit {{.Module}}.
+func NewTokenService() *TokenService {
+	return runtimeauth.NewTokenService(os.Getenv("JWT_SECRET"))
+}
+
+// AuthMiddleware validates the bearer token on each request and attaches the
+// resulting *Claims to the request context. Attach it to the routes that
+// require authentication (the project's chi router in internal/api/server).
+func AuthMiddleware(ts *TokenService) func(http.Handler) http.Handler {
+	return runtimemw.AuthMiddleware(ts)
+}
+
+// GetClaims extracts the claims attached by AuthMiddleware, or false when the
+// request is unauthenticated.
+func GetClaims(r *http.Request) (*Claims, bool) { return runtimemw.GetClaims(r) }
+
+// Re-export the runtime types the rest of {{.Module}} references, keeping the
+// swap point local if the runtime API shifts.
+type (
+	TokenService = runtimeauth.TokenService
+	Claims       = runtimeauth.Claims
+	Role         = runtimeauth.Role
+)
+
+// Re-export the baseline roles so callers reference auth.RoleAdmin rather than
+// the runtime package.
+const (
+	RoleAdmin    = runtimeauth.RoleAdmin
+	RoleOperator = runtimeauth.RoleOperator
+	RoleViewer   = runtimeauth.RoleViewer
+)

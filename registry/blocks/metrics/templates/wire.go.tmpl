@@ -1,0 +1,38 @@
+// Package metric vendors the project-side wiring for ix's metrics block. The
+// Prometheus /metrics service and the coded error-counter live in the imported
+// runtime module; this file is the single place {{.Module}} touches them and
+// re-exports the surface the rest of the project calls.
+package metric
+
+import (
+	"context"
+	"sync"
+
+	runtimemetric "github.com/appsome/ix/runtime/metric"
+)
+
+// Start launches the metrics service on METRIC_PORT and stops it when ctx is
+// cancelled. It owns the WaitGroup the runtime service uses to signal a clean
+// shutdown, so callers in main() inject a single line at the wire-services
+// anchor. The returned WaitGroup can be waited on for a graceful drain; most
+// callers ignore it.
+func Start(ctx context.Context) *sync.WaitGroup {
+	var wg sync.WaitGroup
+	New().Start(ctx, &wg)
+	return &wg
+}
+
+// RecordError increments the error counter for code and logs message + err.
+// A no-op when err is nil, so call sites wrap fallible operations without a
+// surrounding nil check.
+func RecordError(code, message string, err error) {
+	runtimemetric.RecordError(code, message, err)
+}
+
+// New constructs a metrics service for callers that manage the lifecycle
+// themselves rather than using Start.
+func New() Service { return runtimemetric.New() }
+
+// Service is the runtime metrics service, re-exported so callers reference this
+// package rather than the runtime module directly.
+type Service = runtimemetric.Service

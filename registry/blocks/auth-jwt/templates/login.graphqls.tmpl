@@ -1,0 +1,19 @@
+# Authentication schema for {{.Module}}, vendored by the auth-jwt block.
+# Mutation is declared in the base schema (graphql-server); we extend it here so
+# gqlgen merges the login field in. Implement the generated resolver against
+# internal/auth.Service.Login.
+
+"The result of a successful login."
+type AuthPayload {
+  "Signed HS256 access token; send it as `Authorization: Bearer <token>`."
+  accessToken: String!
+  "The authenticated user's email."
+  email: String!
+  "The authenticated user's role (ADMIN | OPERATOR | VIEWER)."
+  role: String!
+}
+
+extend type Mutation {
+  "Exchange email + password for a signed access token."
+  login(email: String!, password: String!): AuthPayload!
+}

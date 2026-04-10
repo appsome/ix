@@ -1,0 +1,16 @@
+-- casbin_rule: policy storage for the Blank-Xu/sql-adapter used by
+-- github.com/appsome/ix/runtime/authz. Column layout matches the adapter's
+-- default (p_type + v0..v5). Generated once by `ix add authz` for {{.Module}}.
+CREATE TABLE IF NOT EXISTS casbin_rule (
+    id     bigserial    PRIMARY KEY,
+    p_type varchar(32)  NOT NULL DEFAULT '',
+    v0     varchar(255) NOT NULL DEFAULT '',
+    v1     varchar(255) NOT NULL DEFAULT '',
+    v2     varchar(255) NOT NULL DEFAULT '',
+    v3     varchar(255) NOT NULL DEFAULT '',
+    v4     varchar(255) NOT NULL DEFAULT '',
+    v5     varchar(255) NOT NULL DEFAULT ''
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_casbin_rule
+    ON casbin_rule (p_type, v0, v1, v2, v3, v4, v5);

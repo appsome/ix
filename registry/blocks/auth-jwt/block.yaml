@@ -1,0 +1,56 @@
+# Runtime-glue block (docs/DESIGN.md §6).
+#
+# The JWT issue/validate, claims, roles, and password-hashing *logic* is
+# imported from github.com/appsome/ix/runtime/auth and .../runtime/middleware
+# (the hybrid model's "imported" half). This block vendors only the project
+# glue: a TokenService constructed from JWT_SECRET, the AuthMiddleware + claims
+# context helpers re-exported through one local package, and a Login flow that
+# composes the runtime primitives against a project-supplied user lookup.
+#
+# Like the authz block, it constructs its service at the wire-services anchor in
+# cmd/api/main.go and leaves attaching the middleware to the router + the login
+# GraphQL resolver as documented next steps (the graphql-server router is
+# private to server.New, so there is no anchor to auto-wire it).
+name: auth-jwt
+version: 0.1.0
+category: runtime-glue
+summary: JWT issue/validate + claims, login flow, auth middleware.
+
+requires:
+  - core-schema
+  - graphql-server
+
+runtime:
+  module: github.com/appsome/ix/runtime
+  version: v0.1.0
+  packages: [auth, middleware]
+
+vars:
+  - { name: Module, from: module }   # generated project's go module path
+
+files:
+  # The project-side auth package: TokenService from env, AuthMiddleware +
+  # claims helpers re-exported, and a user-lookup-decoupled Login flow.
+  - { src: wire.go.tmpl,  dest: internal/auth/wire.go }
+  - { src: login.go.tmpl, dest: internal/auth/login.go }
+  # GraphQL login mutation + AuthPayload. Yours to edit after first render.
+  - { src: login.graphqls.tmpl, dest: internal/api/schema/auth.graphqls, managed: false }
+
+patches:
+  # Construct the token service at the wire-services anchor graphql-server ships
+  # in cmd/api/main.go. The anchor contract provides shutdownCtx, database
+  # (*sql.DB) and dsn in scope; the token service needs none of them, so this
+  # just makes `tokenService` available for the user to thread into server.New /
+  # resolver.New (see the block's post_add next-steps).
+  - file: cmd/api/main.go
+    anchor: "// ix:wire-services"
+    imports:
+      - "{{.Module}}/internal/auth"
+    insert: |
+      tokenService := auth.NewTokenService()
+      _ = tokenService // thread into server.New / resolver.New to enforce auth
+
+hooks:
+  post_add:
+    - "go mod tidy"
+    - "echo 'Next: attach auth.AuthMiddleware(tokenService) to your chi router in internal/api/server, thread tokenService into resolver.New, and implement the login resolver against your users table (see internal/auth/login.go).'"

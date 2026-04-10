@@ -1,0 +1,52 @@
+# Worked example of a runtime-glue block (docs/DESIGN.md §6).
+#
+# The authorization *logic* is imported from github.com/appsome/ix/runtime/authz
+# (the hybrid model's "imported" half). This block vendors only the project
+# glue: the Casbin model, the seed policy you own and edit, the wiring that
+# constructs the enforcer in main.go, and the casbin_rule migration.
+name: authz
+version: 0.1.0
+category: runtime-glue
+summary: Casbin RBAC-with-domains authorization wired into chi + gqlgen.
+
+requires:
+  - core-schema
+  - graphql-server
+
+runtime:
+  module: github.com/appsome/ix/runtime
+  version: v0.1.0
+  packages: [authz, middleware]
+
+vars:
+  - { name: Module, from: module }   # generated project's go module path
+
+files:
+  # The Casbin model definition. Managed: upgrades may improve the matcher.
+  - { src: model.conf.tmpl,      dest: internal/authz/model.conf }
+  # Seed policy is yours after first render — never re-merged.
+  - { src: seed_policy.csv.tmpl, dest: internal/authz/seed_policy.csv, managed: false }
+  # Embed + enforcer construction glue (imports runtime/authz).
+  - { src: wire.go.tmpl,         dest: internal/authz/wire.go }
+  # The casbin_rule table migration. Written once, never regenerated.
+  - { src: migration.sql.tmpl,   dest: "migrations/{{.Timestamp}}_casbin_rule.up.sql", once: true }
+
+patches:
+  # Inject enforcer construction at the wire-services anchor that graphql-server
+  # ships in cmd/api/main.go. The anchor contract provides `shutdownCtx`,
+  # `database` (*sql.DB) and `dsn` (the Postgres DSN) in scope; an empty channel
+  # falls back to the runtime's DefaultWatcherChannel.
+  - file: cmd/api/main.go
+    anchor: "// ix:wire-services"
+    imports:
+      - "{{.Module}}/internal/authz"
+    insert: |
+      authzService, err := authz.NewService(shutdownCtx, database, dsn, "")
+      if err != nil {
+      	log.Fatalf("authz: %v", err)
+      }
+      defer func() { _ = authzService.Close() }()
+
+hooks:
+  post_add:
+    - "go mod tidy"

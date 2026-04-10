@@ -1,0 +1,85 @@
+// Login flow for {{.Module}}. It is deliberately decoupled from the project's
+// user-table shape: callers pass a UserLookup that resolves an email to a
+// stored credential, so this file compiles unchanged whatever your users table
+// looks like. Wire it into the login GraphQL resolver (internal/api/schema/
+// auth.graphqls) once you have a users query.
+package auth
+
+import (
+	"context"
+	"errors"
+
+	runtimeauth "github.com/appsome/ix/runtime/auth"
+)
+
+// ErrInvalidCredentials is returned when the email is unknown or the password
+// does not match. It is intentionally indistinct (no "unknown user" vs "wrong
+// password" leak) so callers cannot enumerate accounts.
+var ErrInvalidCredentials = errors.New("auth: invalid credentials")
+
+// StoredUser is the minimal credential record Login needs. Map your users-table
+// row onto it inside the UserLookup.
+type StoredUser struct {
+	ID           int64
+	Email        string
+	Role         Role
+	PasswordHash string // bcrypt hash; see runtime/auth.ComparePasswordBcrypt
+	PartyID      string // optional tenant claim
+	CountryCode  string // optional tenant claim
+}
+
+// UserLookup resolves an email to a StoredUser. Return (nil, nil) for an
+// unknown email — Login maps that to ErrInvalidCredentials without leaking
+// which half failed.
+type UserLookup func(ctx context.Context, email string) (*StoredUser, error)
+
+// AuthPayload is the result of a successful login: a signed access token and
+// the authenticated user's claims.
+type AuthPayload struct {
+	AccessToken string
+	Claims      Claims
+}
+
+// Login resolves email via lookup, verifies password against the stored bcrypt
+// hash, and issues a signed access token. Swap ComparePasswordBcrypt for the
+// salted-SHA scheme (runtime/auth.HashPassword) if your users table stores
+// those hashes instead.
+func (s *Service) Login(ctx context.Context, email, password string) (*AuthPayload, error) {
+	user, err := s.lookup(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, ErrInvalidCredentials
+	}
+	if err := runtimeauth.ComparePasswordBcrypt(user.PasswordHash, password); err != nil {
+		return nil, ErrInvalidCredentials
+	}
+
+	claims := Claims{
+		UserID:      user.ID,
+		Email:       user.Email,
+		Role:        user.Role,
+		PartyID:     user.PartyID,
+		CountryCode: user.CountryCode,
+	}
+	token, _, err := s.tokens.IssueAccessToken(claims)
+	if err != nil {
+		return nil, err
+	}
+	return &AuthPayload{AccessToken: token, Claims: claims}, nil
+}
+
+// Service composes the token service with a project-supplied user lookup to
+// implement Login. Construct it once in main() and thread it into the login
+// resolver.
+type Service struct {
+	tokens *TokenService
+	lookup UserLookup
+}
+
+// NewService builds the login service. Pass the TokenService from
+// NewTokenService and a UserLookup backed by your users query.
+func NewService(tokens *TokenService, lookup UserLookup) *Service {
+	return &Service{tokens: tokens, lookup: lookup}
+}

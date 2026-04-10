@@ -1,0 +1,19 @@
+# Casbin model for {{.Module}} — RBAC-with-domains + an inline ABAC condition.
+# This is the project-owned copy passed to the runtime via authz.WithModel; edit
+# it freely. Domains map to tenants so a role granted in one tenant does not leak
+# into another. `cond` is an inline expression for ABAC-style constraints.
+
+[request_definition]
+r = sub, dom, obj, act, cond
+
+[policy_definition]
+p = sub, dom, obj, act, cond, eft
+
+[role_definition]
+g = _, _, _
+
+[policy_effect]
+e = some(where (p.eft == allow)) && !some(where (p.eft == deny))
+
+[matchers]
+m = g(r.sub, p.sub, r.dom) && keyMatch2(r.obj, p.obj) && regexMatch(r.act, p.act) && eval(p.cond)

@@ -1,0 +1,43 @@
+# Runtime-glue block (docs/DESIGN.md §6).
+#
+# The Prometheus /metrics service and the coded error-counter logic are imported
+# from github.com/appsome/ix/runtime/metric. This block vendors only the project
+# glue: a local metric package that re-exports the runtime surface and starts
+# the service from main(), so the rest of the project calls metric.RecordError
+# without reaching into the runtime module.
+name: metrics
+version: 0.1.0
+category: runtime-glue
+summary: Prometheus metrics endpoint + coded error registry.
+
+requires:
+  - graphql-server
+
+runtime:
+  module: github.com/appsome/ix/runtime
+  version: v0.1.0
+  packages: [metric]
+
+vars:
+  - { name: Module, from: module }   # generated project's go module path
+
+files:
+  # The project-side metric package: re-exports + a one-call Start that manages
+  # the service's lifecycle against the shutdown context.
+  - { src: wire.go.tmpl, dest: internal/metric/wire.go }
+
+patches:
+  # Start the metrics service at the wire-services anchor graphql-server ships in
+  # cmd/api/main.go. The anchor contract provides shutdownCtx in scope; the
+  # metrics server listens on METRIC_PORT and shuts down when shutdownCtx is
+  # cancelled.
+  - file: cmd/api/main.go
+    anchor: "// ix:wire-services"
+    imports:
+      - "{{.Module}}/internal/metric"
+    insert: |
+      metric.Start(shutdownCtx)
+
+hooks:
+  post_add:
+    - "go mod tidy"

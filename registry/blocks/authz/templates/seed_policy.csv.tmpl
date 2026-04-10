@@ -1,0 +1,10 @@
+# Seed policy for {{.Module}}, loaded into casbin_rule on a fresh install.
+# This file is yours — ix renders it once and never re-merges it.
+#
+# Format (matches the model's policy/role definitions):
+#   p, <sub>, <dom>, <obj>, <act>, <cond>, <eft>
+#   g, <user>, <role>, <dom>
+#
+# Example: an ADMIN role with cross-tenant access, and one admin user.
+p, admin, *, /*, (GET|POST|PUT|DELETE), true, allow
+g, admin@example.com, admin, *

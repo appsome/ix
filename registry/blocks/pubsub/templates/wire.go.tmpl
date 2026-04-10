@@ -1,0 +1,28 @@
+// Package pubsub vendors the project-side wiring for ix's pubsub block. The
+// in-process + Postgres LISTEN/NOTIFY broker logic lives in the imported
+// runtime module; this file is the single place {{.Module}} constructs a broker
+// and re-exports the Broker surface the Subscription resolvers depend on.
+package pubsub
+
+import (
+	"context"
+
+	runtimepubsub "github.com/appsome/ix/runtime/pubsub"
+)
+
+// NewBroker returns a broker for {{.Module}}. When dsn is non-empty it builds a
+// Postgres LISTEN/NOTIFY broker listening on channels (so publishers in sibling
+// processes reach subscribers via NOTIFY); with an empty dsn it returns the
+// in-process broker, which never errors. The broker runs until ctx is
+// cancelled; callers Close it on shutdown.
+func NewBroker(ctx context.Context, dsn string, channels ...string) (Broker, error) {
+	if dsn == "" {
+		return runtimepubsub.NewInProcessBroker(), nil
+	}
+	// 0/0 reconnect bounds use the runtime defaults (10s/1m).
+	return runtimepubsub.NewPostgresBroker(ctx, dsn, channels, 0, 0)
+}
+
+// Broker is the runtime pub/sub surface, re-exported so the rest of {{.Module}}
+// references this package rather than the runtime module directly.
+type Broker = runtimepubsub.Broker

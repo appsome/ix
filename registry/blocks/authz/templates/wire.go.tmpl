@@ -1,0 +1,44 @@
+// Package authz vendors the project-side wiring for ix's authorization block.
+// The enforcement logic lives in the imported runtime module; this file embeds
+// the project-owned model + seed policy and is the single place to customize
+// how the enforcer is constructed for {{.Module}}.
+package authz
+
+import (
+	"context"
+	"database/sql"
+	_ "embed"
+
+	runtimeauthz "github.com/appsome/ix/runtime/authz"
+)
+
+//go:embed model.conf
+var modelConf string
+
+//go:embed seed_policy.csv
+var seedPolicyCSV []byte
+
+// Model returns the project-owned Casbin model definition.
+func Model() string { return modelConf }
+
+// SeedPolicy returns the embedded seed policy CSV loaded on a fresh install.
+func SeedPolicy() []byte { return seedPolicyCSV }
+
+// NewService constructs the authz enforcer for {{.Module}}, passing the
+// project-owned model via WithModel so edits to model.conf take effect without
+// touching the runtime module. connString/channel drive the multi-replica
+// LISTEN/NOTIFY watcher; pass an empty channel to use the runtime default.
+func NewService(ctx context.Context, db *sql.DB, connString, channel string) (*runtimeauthz.Service, error) {
+	return runtimeauthz.NewServiceWithWatcher(ctx, db, connString, channel, runtimeauthz.WithModel(Model()))
+}
+
+// Re-export the runtime types the rest of {{.Module}} references, so callers
+// import this single project package rather than reaching into the runtime
+// module directly — keeping the swap point local if the runtime API shifts.
+type (
+	Service  = runtimeauthz.Service
+	Subject  = runtimeauthz.Subject
+	Domain   = runtimeauthz.Domain
+	Resource = runtimeauthz.Resource
+	Action   = runtimeauthz.Action
+)
