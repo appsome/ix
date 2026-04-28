@@ -1,0 +1,9 @@
+# Applies the Atlas migration history for {{.App}} against $DATABASE_URL, then
+# exits. Run once on deploy (a Helm hook / compose one-shot service).
+FROM arigaio/atlas:latest
+
+WORKDIR /migrations
+COPY migrations ./
+
+# DATABASE_URL e.g. postgres://user:pass@host:5432/db?sslmode=disable
+ENTRYPOINT ["atlas", "migrate", "apply", "--dir", "file:///migrations", "--url", "${DATABASE_URL}"]

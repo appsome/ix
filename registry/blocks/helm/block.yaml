@@ -1,0 +1,26 @@
+# Helm chart for the {{.App}} api service (docs/DESIGN.md §8). A single-service
+# chart (Deployment + Service + Ingress + HPA). Chart.yaml/values.yaml are
+# ix-rendered for the app name; the
+# template bodies are `raw` because they are themselves Helm (Go) templates and
+# must not pass through ix's renderer.
+name: helm
+version: 0.1.0
+category: infra
+summary: Helm chart for the api service — Deployment, Service, Ingress, HPA.
+
+requires:
+  - docker
+
+vars:
+  - { name: Module, from: module }
+
+files:
+  - { src: Chart.yaml.tmpl,    dest: "charts/{{.App}}/Chart.yaml" }
+  - { src: values.yaml.tmpl,   dest: "charts/{{.App}}/values.yaml" }
+  - { src: _helpers.tpl,       dest: "charts/{{.App}}/templates/_helpers.tpl",      raw: true }
+  - { src: deployment.yaml,    dest: "charts/{{.App}}/templates/deployment.yaml",   raw: true }
+  - { src: service.yaml,       dest: "charts/{{.App}}/templates/service.yaml",      raw: true }
+  - { src: ingress.yaml,       dest: "charts/{{.App}}/templates/ingress.yaml",      raw: true }
+  - { src: hpa.yaml,           dest: "charts/{{.App}}/templates/hpa.yaml",          raw: true }
+  - { src: migrations-job.yaml, dest: "charts/{{.App}}/templates/migrations-job.yaml", raw: true }
+  - { src: helmignore,         dest: "charts/{{.App}}/.helmignore",                 raw: true }

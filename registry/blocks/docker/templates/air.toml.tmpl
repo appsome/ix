@@ -1,0 +1,21 @@
+# air hot-reload for the {{.App}} api during local development: `air`.
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  bin = "./tmp/api"
+  cmd = "go build -o ./tmp/api ./cmd/api"
+  delay = 1000
+  exclude_dir = ["tmp", "vendor", "node_modules", "web", ".ix", "migrations"]
+  exclude_regex = ["_test.go"]
+  include_ext = ["go", "tmpl", "html", "graphqls"]
+  kill_delay = "0s"
+  log = "build-errors.log"
+  stop_on_error = false
+
+[log]
+  main_only = false
+  time = false
+
+[misc]
+  clean_on_exit = false

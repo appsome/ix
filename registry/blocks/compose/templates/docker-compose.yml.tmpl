@@ -1,0 +1,91 @@
+# Local development stack for {{.App}}.
+services:
+  postgres:
+{{- if .PostGIS }}
+    image: postgis/postgis:17-3.5-alpine
+{{- else }}
+    image: postgres:17-alpine
+{{- end }}
+    environment:
+      POSTGRES_DB: ${DB_NAME:-{{.App}}}
+      POSTGRES_USER: ${DB_USER:-{{.App}}}
+      POSTGRES_PASSWORD: ${DB_PASS:-{{.App}}}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-{{.App}}}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrations:
+    build:
+      context: .
+      dockerfile: Dockerfile.migrations
+    environment:
+      DATABASE_URL: postgres://${DB_USER:-{{.App}}}:${DB_PASS:-{{.App}}}@postgres:5432/${DB_NAME:-{{.App}}}?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      - DB_HOST=postgres:5432
+      - DB_NAME=${DB_NAME:-{{.App}}}
+      - DB_USER=${DB_USER:-{{.App}}}
+      - DB_PASS=${DB_PASS:-{{.App}}}
+      - SSL_MODE=disable
+      - REST_PORT=8080
+      - JWT_SECRET=${JWT_SECRET:-change-me}
+      - REDIS_ADDR=redis:6379
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrations:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  # Background worker for the jobs block. Uncomment once you `ix add jobs` and
+  # add a `worker` target to Dockerfile.api (build ./cmd/worker). Set
+  # JOBS_SCHEDULER=1 on exactly one replica to run cron schedules.
+  # worker:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.api
+  #     target: worker
+  #   environment:
+  #     - REDIS_ADDR=redis:6379
+  #     - JOBS_SCHEDULER=1
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #     migrations:
+  #       condition: service_completed_successfully
+  #   restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

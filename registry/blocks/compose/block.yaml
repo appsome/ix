@@ -1,0 +1,17 @@
+# Local dev stack (docs/DESIGN.md §8): Postgres (+PostGIS when enabled), the api
+# service, and a one-shot Atlas migrations job. Templatized and trimmed to the
+# ix default service set.
+name: compose
+version: 0.1.0
+category: infra
+summary: "docker-compose: postgres(+postgis), api service, one-shot migrations."
+
+requires:
+  - docker
+
+vars:
+  - { name: Module,  from: module }
+  - { name: PostGIS, from: database.postgis }
+
+files:
+  - { src: docker-compose.yml.tmpl, dest: docker-compose.yml }

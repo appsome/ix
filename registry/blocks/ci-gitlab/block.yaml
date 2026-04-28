@@ -1,0 +1,14 @@
+# GitLab CI pipeline (docs/DESIGN.md §8): a generic lint/test/build. Files are
+# `raw`: GitLab uses $VAR (no Go-template braces) and image names come from
+# $CI_REGISTRY_IMAGE, so no ix vars are needed.
+name: ci-gitlab
+version: 0.1.0
+category: infra
+summary: "GitLab CI: lint, test (Postgres service), docker build + pre-commit."
+
+requires:
+  - graphql-server
+
+files:
+  - { src: gitlab-ci.yml,          dest: .gitlab-ci.yml,          raw: true }
+  - { src: pre-commit-config.yaml, dest: .pre-commit-config.yaml, raw: true }

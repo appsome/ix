@@ -1,0 +1,18 @@
+# Container build + dev hot-reload (docs/DESIGN.md §8). A multi-stage Dockerfile
+# and air config, templatized to the project's module + app name.
+name: docker
+version: 0.1.0
+category: infra
+summary: Multi-stage API Dockerfile, atlas migrations image, .dockerignore, air hot-reload.
+
+requires:
+  - graphql-server
+
+vars:
+  - { name: Module, from: module }
+
+files:
+  - { src: Dockerfile.api.tmpl,        dest: Dockerfile.api }
+  - { src: Dockerfile.migrations.tmpl, dest: Dockerfile.migrations }
+  - { src: dockerignore,               dest: .dockerignore }
+  - { src: air.toml.tmpl,              dest: .air.toml }

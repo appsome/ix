@@ -1,0 +1,27 @@
+# Infra block (docs/DESIGN.md §6): a standalone admin CLI binary, not runtime
+# glue. It builds on the authz block — constructing the project's vendored
+# authz.Service and driving its policy/role management methods — so it requires
+# both core-schema (the DB + casbin_rule table) and authz (the service + model).
+#
+# Built with the standard library flag package, matching the ix CLI's own style
+# (no cobra), so it adds no new external dependency.
+name: admin-cli
+version: 0.1.0
+category: infra
+summary: CLI for user/role/policy management.
+
+requires:
+  - core-schema
+  - authz
+
+vars:
+  - { name: Module, from: module }   # generated project's go module path
+
+files:
+  # The admin CLI binary. Written once; yours to extend with project commands.
+  - { src: main.go.tmpl, dest: cmd/admin-cli/main.go, once: true }
+
+hooks:
+  post_add:
+    - "go mod tidy"
+    - "echo 'Build it: go build -o bin/admin-cli ./cmd/admin-cli — then e.g. admin-cli policy list (uses the DB_* env vars).'"

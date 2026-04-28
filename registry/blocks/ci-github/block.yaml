@@ -1,0 +1,13 @@
+# GitHub Actions pipeline (docs/DESIGN.md §8). The workflow is `raw` because it
+# contains GitHub ${{ }} expressions that must not pass through ix's Go-template
+# renderer; image names come from the GitHub context, so no ix vars are needed.
+name: ci-github
+version: 0.1.0
+category: infra
+summary: "GitHub Actions: lint, test (with Postgres service), docker build."
+
+requires:
+  - graphql-server
+
+files:
+  - { src: ci.yml, dest: .github/workflows/ci.yml, raw: true }

@@ -1,0 +1,219 @@
+// Command admin-cli manages {{.Module}}'s authorization policies and role
+// assignments from the terminal. It constructs the project's vendored authz
+// service (internal/authz) and drives its policy/role methods.
+//
+// It connects with the same DB_* environment variables as the API server:
+//
+//	admin-cli policy list
+//	admin-cli policy add    --sub alice --dom '*' --obj /widgets --act GET
+//	admin-cli policy remove --sub alice --dom '*' --obj /widgets --act GET
+//	admin-cli role list
+//	admin-cli role assign --user alice --role ADMIN --dom '*'
+//	admin-cli role remove --user alice --role ADMIN --dom '*'
+//
+// Written once by the admin-cli block; extend it with project-specific commands.
+package main
+
+import (
+	"context"
+	"database/sql"
+	"flag"
+	"fmt"
+	"os"
+	"text/tabwriter"
+
+	_ "github.com/lib/pq"
+
+	runtimeauthz "github.com/appsome/ix/runtime/authz"
+
+	"{{.Module}}/internal/authz"
+)
+
+func main() {
+	if err := run(context.Background(), os.Args[1:]); err != nil {
+		fmt.Fprintln(os.Stderr, "admin-cli: "+err.Error())
+		os.Exit(1)
+	}
+}
+
+func run(ctx context.Context, args []string) error {
+	if len(args) == 0 {
+		return usage()
+	}
+
+	// help must not require a database connection.
+	switch args[0] {
+	case "help", "-h", "--help":
+		return usage()
+	case "policy", "role":
+		// handled below, after connecting
+	default:
+		return fmt.Errorf("unknown command %q (want: policy | role)", args[0])
+	}
+
+	svc, err := newService(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = svc.Close() }()
+
+	switch args[0] {
+	case "policy":
+		return policyCmd(ctx, svc, args[1:])
+	default: // "role" — the only remaining case after the guard above
+		return roleCmd(ctx, svc, args[1:])
+	}
+}
+
+// newService opens the database from DB_* env vars and builds the vendored
+// authz service. An empty watcher channel uses the runtime default — fine for a
+// short-lived CLI.
+func newService(ctx context.Context) (*authz.Service, error) {
+	dsn := fmt.Sprintf(
+		"postgres://%s:%s@%s/%s?sslmode=%s",
+		os.Getenv("DB_USER"), os.Getenv("DB_PASS"), os.Getenv("DB_HOST"),
+		os.Getenv("DB_NAME"), getenv("SSL_MODE", "disable"),
+	)
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("db open: %w", err)
+	}
+	svc, err := authz.NewService(ctx, db, dsn, "")
+	if err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("authz: %w", err)
+	}
+	return svc, nil
+}
+
+func policyCmd(ctx context.Context, svc *authz.Service, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("policy: want add | remove | list")
+	}
+	switch args[0] {
+	case "list":
+		rows, err := svc.ListPolicies()
+		if err != nil {
+			return err
+		}
+		w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
+		fmt.Fprintln(w, "SUBJECT\tDOMAIN\tRESOURCE\tACTION\tEFFECT")
+		for _, r := range rows {
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", r.Subject, r.Domain, r.Resource, r.Action, r.Effect)
+		}
+		return w.Flush()
+	case "add", "remove":
+		fs := flag.NewFlagSet("policy "+args[0], flag.ContinueOnError)
+		sub := fs.String("sub", "", "subject (user id or role)")
+		dom := fs.String("dom", "*", "tenant domain ('*' = cross-tenant)")
+		obj := fs.String("obj", "", "resource (REST path or GraphQL op)")
+		act := fs.String("act", "", "action verb (e.g. GET, LIST)")
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		if *sub == "" || *obj == "" || *act == "" {
+			return fmt.Errorf("policy %s: --sub, --obj and --act are required", args[0])
+		}
+		row := runtimeauthz.PolicyRow{
+			Subject:   runtimeauthz.Subject(*sub),
+			Domain:    runtimeauthz.Domain(*dom),
+			Resource:  runtimeauthz.Resource(*obj),
+			Action:    runtimeauthz.Action(*act),
+			Condition: runtimeauthz.DefaultCondition,
+			Effect:    runtimeauthz.EffectAllow,
+		}
+		var changed bool
+		var err error
+		if args[0] == "add" {
+			changed, err = svc.AddPolicy(ctx, row)
+		} else {
+			changed, err = svc.RemovePolicy(ctx, row)
+		}
+		if err != nil {
+			return err
+		}
+		report(changed, args[0])
+		return nil
+	default:
+		return fmt.Errorf("policy: unknown subcommand %q (want add | remove | list)", args[0])
+	}
+}
+
+func roleCmd(ctx context.Context, svc *authz.Service, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("role: want assign | remove | list")
+	}
+	switch args[0] {
+	case "list":
+		rows, err := svc.ListGroupingPolicies()
+		if err != nil {
+			return err
+		}
+		w := tabwriter.NewWriter(os.Stdout, 0, 2, 2, ' ', 0)
+		fmt.Fprintln(w, "USER\tROLE\tDOMAIN")
+		for _, r := range rows {
+			fmt.Fprintf(w, "%s\t%s\t%s\n", r.User, r.Role, r.Domain)
+		}
+		return w.Flush()
+	case "assign", "remove":
+		fs := flag.NewFlagSet("role "+args[0], flag.ContinueOnError)
+		user := fs.String("user", "", "user id")
+		role := fs.String("role", "", "role name (e.g. ADMIN)")
+		dom := fs.String("dom", "*", "tenant domain ('*' = cross-tenant)")
+		if err := fs.Parse(args[1:]); err != nil {
+			return err
+		}
+		if *user == "" || *role == "" {
+			return fmt.Errorf("role %s: --user and --role are required", args[0])
+		}
+		row := runtimeauthz.GroupingRow{
+			User:   runtimeauthz.Subject(*user),
+			Role:   runtimeauthz.Subject(*role),
+			Domain: runtimeauthz.Domain(*dom),
+		}
+		var changed bool
+		var err error
+		if args[0] == "assign" {
+			changed, err = svc.AddGroupingPolicy(ctx, row)
+		} else {
+			changed, err = svc.RemoveGroupingPolicy(ctx, row)
+		}
+		if err != nil {
+			return err
+		}
+		report(changed, args[0])
+		return nil
+	default:
+		return fmt.Errorf("role: unknown subcommand %q (want assign | remove | list)", args[0])
+	}
+}
+
+func report(changed bool, verb string) {
+	if changed {
+		fmt.Printf("ok: %sed\n", verb)
+	} else {
+		fmt.Printf("no change (already in desired state)\n")
+	}
+}
+
+func usage() error {
+	fmt.Println(`admin-cli — manage {{.Module}} authorization
+
+Usage:
+  admin-cli policy list
+  admin-cli policy add    --sub <s> --dom <d> --obj <r> --act <a>
+  admin-cli policy remove --sub <s> --dom <d> --obj <r> --act <a>
+  admin-cli role list
+  admin-cli role assign --user <u> --role <r> --dom <d>
+  admin-cli role remove --user <u> --role <r> --dom <d>
+
+Connects via the DB_USER/DB_PASS/DB_HOST/DB_NAME environment variables.`)
+	return nil
+}
+
+func getenv(key, fallback string) string {
+	if v, ok := os.LookupEnv(key); ok {
+		return v
+	}
+	return fallback
+}
