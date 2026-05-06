@@ -1,0 +1,50 @@
+# SvelteKit + shadcn-svelte + Houdini admin shell (docs/DESIGN.md §9). Vendored
+# into web/; you own every file.
+#
+# All files are `raw` (copied verbatim) except package.json — Svelte/TS/CSS
+# bodies contain brace sequences that must not pass through ix's Go-template
+# renderer. The per-entity list/show pages come from `ix add entity --frontend`.
+name: admin-svelte
+version: 0.1.0
+category: frontend
+summary: SvelteKit + shadcn-svelte + Houdini admin shell with auth, tenant switcher, data-table.
+
+requires:
+  - graphql-server
+
+vars:
+  - { name: Module, from: module }
+
+files:
+  # Project config (package.json rendered for the app name; rest verbatim).
+  - { src: package.json.tmpl,   dest: web/package.json }
+  - { src: svelte.config.js,    dest: web/svelte.config.js,    raw: true }
+  - { src: vite.config.ts,      dest: web/vite.config.ts,      raw: true }
+  - { src: tsconfig.json,       dest: web/tsconfig.json,       raw: true }
+  - { src: tailwind.config.ts,  dest: web/tailwind.config.ts,  raw: true }
+  - { src: postcss.config.js,   dest: web/postcss.config.js,   raw: true }
+  - { src: components.json,     dest: web/components.json,      raw: true }
+  - { src: houdini.config.js,   dest: web/houdini.config.js,    raw: true }
+  - { src: env.example,         dest: web/.env.example,         raw: true }
+  - { src: gitignore,           dest: web/.gitignore,           raw: true }
+  - { src: README.md,           dest: web/README.md,            raw: true }
+  # App entry + global styles.
+  - { src: app.html,            dest: web/src/app.html,         raw: true }
+  - { src: app.css,             dest: web/src/app.css,          raw: true }
+  - { src: app.d.ts,            dest: web/src/app.d.ts,         raw: true }
+  - { src: client.ts,           dest: web/src/client.ts,        raw: true }
+  # Shared lib you own (auth, gql helper, ui).
+  - { src: lib/utils.ts,        dest: web/src/lib/ix/utils.ts,                 raw: true }
+  - { src: lib/auth.ts,         dest: web/src/lib/ix/auth.ts,                  raw: true }
+  - { src: lib/DataTable.svelte, dest: web/src/lib/ix/DataTable.svelte,        raw: true }
+  # Routes: root layout, admin layout (nav + guard + tenant switcher), login.
+  - { src: routes/layout.svelte,        dest: "web/src/routes/+layout.svelte",          raw: true }
+  - { src: routes/layout.ts,            dest: "web/src/routes/+layout.ts",              raw: true }
+  - { src: routes/admin.layout.svelte,  dest: "web/src/routes/(admin)/+layout.svelte",  raw: true }
+  - { src: routes/admin.layout.ts,      dest: "web/src/routes/(admin)/+layout.ts",      raw: true }
+  - { src: routes/admin.page.svelte,    dest: "web/src/routes/(admin)/+page.svelte",    raw: true }
+  - { src: routes/login.page.svelte,    dest: "web/src/routes/login/+page.svelte",      raw: true }
+
+hooks:
+  post_add:
+    - "echo 'web/ scaffolded. Next: cd web && npm install && npm run dev (API on :8080). Add shadcn-svelte components with: npx shadcn-svelte@latest add button table'"
