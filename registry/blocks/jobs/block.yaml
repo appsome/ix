@@ -1,0 +1,57 @@
+# Runtime-glue block (docs/DESIGN.md §6).
+#
+# Asynq-backed background task queue. The client/server/scheduler/inspector
+# logic is imported from github.com/appsome/ix/runtime/jobs; this block vendors
+# the project glue: a local jobs package (env -> RedisConfig, constructors,
+# re-exports, and the EnqueueAfterCommit helper that sidesteps the two-store
+# visibility race), a standalone worker binary (cmd/worker) with handler +
+# schedule registration, and a patch that constructs the enqueue Client in the
+# API's main() so resolvers can enqueue tasks.
+#
+# Requires Redis (the compose block ships one; helm exposes REDIS_* env). The
+# optional admin/monitoring UI is a separate block, jobs-admin.
+name: jobs
+version: 0.1.0
+category: runtime-glue
+summary: Asynq (Redis) background task queue + worker binary; optional admin via jobs-admin.
+
+requires:
+  - graphql-server
+
+runtime:
+  module: github.com/appsome/ix/runtime
+  version: v0.2.0
+  packages: [jobs]
+
+vars:
+  - { name: Module, from: module }   # generated project's go module path
+
+files:
+  # Project-side wiring: env config, constructors, re-exports, post-commit enqueue.
+  - { src: wire.go.tmpl,        dest: internal/jobs/wire.go }
+  # Standalone worker process. Written once; yours to run/scale.
+  - { src: worker_main.go.tmpl, dest: cmd/worker/main.go,    once: true }
+  # Handler + schedule registration. Written once; yours to extend.
+  - { src: handlers.go.tmpl,    dest: cmd/worker/handlers.go, once: true }
+
+patches:
+  # Construct the enqueue Client at the wire-services anchor graphql-server
+  # ships in cmd/api/main.go (shutdownCtx + database + dsn in scope). Thread
+  # `jobClient` into resolver.New to enqueue tasks from mutations; prefer
+  # jobs.EnqueueAfterCommit when the mutation also writes the database.
+  - file: cmd/api/main.go
+    anchor: "// ix:wire-services"
+    imports:
+      - "{{.Module}}/internal/jobs"
+    insert: |
+      jobClient, err := jobs.NewClient()
+      if err != nil {
+      	log.Fatalf("jobs: %v", err)
+      }
+      defer func() { _ = jobClient.Close() }()
+      _ = jobClient // thread into resolver.New to enqueue tasks from mutations
+
+hooks:
+  post_add:
+    - "go mod tidy"
+    - "echo 'Next: run the worker with `go run ./cmd/worker` (set JOBS_SCHEDULER=1 on exactly one instance for cron). Register handlers in cmd/worker/handlers.go and thread jobClient into resolver.New to enqueue from mutations. Add the jobs-admin block for a monitoring UI.'"

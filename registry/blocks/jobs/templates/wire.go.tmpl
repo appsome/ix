@@ -1,0 +1,153 @@
+// Package jobs vendors the project-side wiring for ix's jobs block. The
+// Asynq-backed client/server/scheduler/inspector logic lives in the imported
+// runtime module; this file is the single place {{.Module}} touches it, reads
+// the Redis config from the environment, and re-exports the surface the rest of
+// the project uses to enqueue and process background tasks.
+//
+// Asynq delivers at-least-once, so every handler you register MUST be
+// idempotent. Redis is a separate datastore from Postgres: when you enqueue a
+// task as part of an operation that also writes the database, enqueue only
+// AFTER that transaction commits, or a worker may run the task before the row
+// it depends on is visible. See EnqueueAfterCommit below for the pattern.
+package jobs
+
+import (
+	"context"
+	"database/sql"
+	"os"
+	"strconv"
+
+	runtimejobs "github.com/appsome/ix/runtime/jobs"
+)
+
+// RedisFromEnv builds the Redis config from the environment. REDIS_URL wins if
+// set (redis://[:pass@]host:port/db); otherwise REDIS_ADDR (default
+// 127.0.0.1:6379), REDIS_PASSWORD, and REDIS_DB are used. This matches the
+// REDIS_* vars the compose and helm blocks export.
+func RedisFromEnv() RedisConfig {
+	db, _ := strconv.Atoi(os.Getenv("REDIS_DB"))
+	return RedisConfig{
+		URL:      os.Getenv("REDIS_URL"),
+		Addr:     os.Getenv("REDIS_ADDR"),
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       db,
+	}
+}
+
+// NewClient constructs the enqueue client from the environment's Redis config.
+// Hold one per process and Close it on shutdown.
+func NewClient() (*Client, error) {
+	return runtimejobs.NewClient(RedisFromEnv())
+}
+
+// NewServer constructs the worker server. Register handlers on it with Handle,
+// then Run (worker process) or Start (co-located goroutine). Concurrency reads
+// JOBS_CONCURRENCY (default 10 via the runtime when 0).
+func NewServer() (*Server, error) {
+	concurrency, _ := strconv.Atoi(os.Getenv("JOBS_CONCURRENCY"))
+	return runtimejobs.NewServer(Config{
+		Redis:       RedisFromEnv(),
+		Concurrency: concurrency,
+	})
+}
+
+// NewScheduler constructs the cron scheduler. Run exactly one per cluster.
+func NewScheduler() (*Scheduler, error) {
+	return runtimejobs.NewScheduler(RedisFromEnv())
+}
+
+// NewInspector constructs a read/management inspector over the queues, used by
+// the optional admin interface. Close it on shutdown.
+func NewInspector() (*Inspector, error) {
+	return runtimejobs.NewInspector(RedisFromEnv())
+}
+
+// EnqueueAfterCommit enqueues task inside the same logical operation as a
+// database write while sidestepping the two-store visibility race: it runs fn
+// (your DB work) in a transaction, commits, and only then enqueues. If fn or
+// the commit fails nothing is enqueued; if the enqueue fails after commit the
+// DB change stands and the error is returned for the caller to log/retry. This
+// is the Asynq-safe analogue of River's transactional enqueue.
+func EnqueueAfterCommit(ctx context.Context, db *sql.DB, c *Client, task *Task, fn func(*sql.Tx) error, opts ...Option) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	if err := fn(tx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	_, err = c.Enqueue(ctx, task, opts...)
+	return err
+}
+
+// Below: re-exports so the rest of {{.Module}} references this package rather
+// than the runtime module directly.
+
+// Client enqueues tasks.
+type Client = runtimejobs.Client
+
+// Server processes tasks via registered handlers.
+type Server = runtimejobs.Server
+
+// Scheduler enqueues recurring tasks on a cron schedule.
+type Scheduler = runtimejobs.Scheduler
+
+// Inspector provides read/management access to queues and tasks.
+type Inspector = runtimejobs.Inspector
+
+// State names a task lifecycle state for the inspector's task listing.
+type State = runtimejobs.State
+
+// Task lifecycle states, re-exported for the admin interface.
+const (
+	StateActive    = runtimejobs.StateActive
+	StatePending   = runtimejobs.StatePending
+	StateScheduled = runtimejobs.StateScheduled
+	StateRetry     = runtimejobs.StateRetry
+	StateArchived  = runtimejobs.StateArchived
+	StateCompleted = runtimejobs.StateCompleted
+)
+
+// QueueStats is a queue's per-state task counts, re-exported for the admin API.
+type QueueStats = runtimejobs.QueueStats
+
+// ListedTask is a task as shown in a management list, re-exported for the admin API.
+type ListedTask = runtimejobs.ListedTask
+
+// Config tunes the worker server.
+type Config = runtimejobs.Config
+
+// RedisConfig identifies the backing Redis.
+type RedisConfig = runtimejobs.RedisConfig
+
+// Task is a unit of background work.
+type Task = runtimejobs.Task
+
+// TaskInfo is an enqueue receipt.
+type TaskInfo = runtimejobs.TaskInfo
+
+// HandlerFunc processes one task.
+type HandlerFunc = runtimejobs.HandlerFunc
+
+// Option customizes an enqueue.
+type Option = runtimejobs.Option
+
+// NewTask builds a task of typ carrying payload.
+func NewTask(typ string, payload []byte) *Task { return runtimejobs.NewTask(typ, payload) }
+
+// Enqueue option re-exports.
+var (
+	Queue     = runtimejobs.Queue
+	MaxRetry  = runtimejobs.MaxRetry
+	Delay     = runtimejobs.Delay
+	ProcessAt = runtimejobs.ProcessAt
+	Timeout   = runtimejobs.Timeout
+	Deadline  = runtimejobs.Deadline
+	Unique    = runtimejobs.Unique
+	TaskID    = runtimejobs.TaskID
+	Retention = runtimejobs.Retention
+)

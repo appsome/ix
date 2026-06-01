@@ -1,0 +1,115 @@
+// Package jobsadmin vendors the project-side admin/monitoring API for the jobs
+// block. It exposes a small JSON HTTP surface over the runtime jobs Inspector —
+// queue stats, paginated task lists by state, and per-task run/archive/delete
+// actions — that the admin-svelte jobs dashboard consumes.
+//
+// Mount it on the API's chi router behind your auth/authz middleware (the
+// jobs-admin block patches cmd/api/main.go to do this at the jobs admin
+// inspector). The routes live under a caller-chosen prefix, conventionally
+// /admin/jobs.
+package jobsadmin
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+
+	"github.com/go-chi/chi/v5"
+
+	"{{.Module}}/internal/jobs"
+)
+
+// Handler builds a chi router exposing the jobs admin API backed by insp. The
+// caller mounts it (e.g. r.Mount("/admin/jobs", jobsadmin.Handler(insp))) under
+// whatever auth middleware guards the rest of admin. The inspector is owned by
+// the caller; this handler never closes it.
+func Handler(insp *jobs.Inspector) http.Handler {
+	h := &handler{insp: insp}
+	r := chi.NewRouter()
+	r.Get("/queues", h.listQueues)
+	r.Get("/queues/{queue}/tasks", h.listTasks)
+	r.Post("/queues/{queue}/tasks/{id}/run", h.runTask)
+	r.Post("/queues/{queue}/tasks/{id}/archive", h.archiveTask)
+	r.Delete("/queues/{queue}/tasks/{id}", h.deleteTask)
+	return r
+}
+
+type handler struct {
+	insp *jobs.Inspector
+}
+
+// listQueues returns one stats object per queue for the dashboard overview.
+func (h *handler) listQueues(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.insp.Queues()
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, stats)
+}
+
+// listTasks returns tasks in a queue for the requested ?state (default
+// pending), paginated via ?page and ?pageSize.
+func (h *handler) listTasks(w http.ResponseWriter, r *http.Request) {
+	queue := chi.URLParam(r, "queue")
+	state := jobs.State(defaultStr(r.URL.Query().Get("state"), "pending"))
+	page := atoiDefault(r.URL.Query().Get("page"), 1)
+	pageSize := atoiDefault(r.URL.Query().Get("pageSize"), 50)
+
+	tasks, err := h.insp.ListTasks(queue, state, page, pageSize)
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, tasks)
+}
+
+func (h *handler) runTask(w http.ResponseWriter, r *http.Request) {
+	h.act(w, h.insp.RunTask(chi.URLParam(r, "queue"), chi.URLParam(r, "id")))
+}
+
+func (h *handler) archiveTask(w http.ResponseWriter, r *http.Request) {
+	h.act(w, h.insp.ArchiveTask(chi.URLParam(r, "queue"), chi.URLParam(r, "id")))
+}
+
+func (h *handler) deleteTask(w http.ResponseWriter, r *http.Request) {
+	h.act(w, h.insp.DeleteTask(chi.URLParam(r, "queue"), chi.URLParam(r, "id")))
+}
+
+// act maps a management call's error to a response: 204 on success, 502 on
+// failure (the inspector talks to Redis, so failures are upstream).
+func (h *handler) act(w http.ResponseWriter, err error) {
+	if err != nil {
+		writeErr(w, http.StatusBadGateway, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func writeErr(w http.ResponseWriter, status int, err error) {
+	writeJSON(w, status, map[string]string{"error": err.Error()})
+}
+
+func defaultStr(v, fallback string) string {
+	if v == "" {
+		return fallback
+	}
+	return v
+}
+
+func atoiDefault(s string, fallback int) int {
+	if s == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return fallback
+	}
+	return n
+}

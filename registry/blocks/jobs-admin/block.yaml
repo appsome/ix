@@ -1,0 +1,64 @@
+# Frontend + runtime-glue block (docs/DESIGN.md §6): the optional admin /
+# monitoring interface for the jobs block. Two halves:
+#
+#   1. Go: a jobsadmin JSON HTTP handler over the runtime jobs Inspector
+#      (queue stats, tasks-by-state, run/archive/delete), mounted on the API's
+#      chi router behind the same auth middleware as the rest of admin.
+#   2. SvelteKit: a /jobs dashboard page in the admin-svelte shell that consumes
+#      that API with the admin's Bearer/X-Tenant headers.
+#
+# Requires both jobs (the queue + inspector) and admin-svelte (the shell the
+# page lives in). It does not embed asynqmon — the dashboard is a page you own,
+# consistent with the rest of the admin.
+name: jobs-admin
+version: 0.1.0
+category: frontend
+summary: Optional admin dashboard to monitor/manage Asynq jobs (queue stats, retry/archive/delete).
+
+requires:
+  - jobs
+  - admin-svelte
+
+runtime:
+  module: github.com/appsome/ix/runtime
+  version: v0.2.0
+  packages: [jobs]
+
+vars:
+  - { name: Module, from: module }
+
+files:
+  # Go: the jobs admin JSON API handler.
+  - { src: handler.go.tmpl,   dest: internal/jobsadmin/handler.go }
+  # Svelte: the dashboard page (raw — Svelte braces skip ix's Go renderer).
+  - { src: jobs.page.svelte,  dest: "web/src/routes/(admin)/jobs/+page.svelte", raw: true }
+
+patches:
+  # Construct an Inspector and mount the admin API on the chi router. This runs
+  # at the wire-services anchor (shutdownCtx in scope); the jobs block's own
+  # patch already imports internal/jobs. We mount on `srv`'s router via the
+  # router-mount anchor graphql-server ships; if absent, mount manually where
+  # you build the chi.Mux.
+  - file: cmd/api/main.go
+    anchor: "// ix:wire-services"
+    imports:
+      - "{{.Module}}/internal/jobsadmin"
+    insert: |
+      jobInspector, err := jobs.NewInspector()
+      if err != nil {
+      	log.Fatalf("jobs admin: %v", err)
+      }
+      defer func() { _ = jobInspector.Close() }()
+      // Mount the jobs admin API behind your admin auth, e.g. in server.New:
+      //   r.Mount("/admin/jobs", jobsadmin.Handler(jobInspector))
+      _ = jobsadmin.Handler(jobInspector)
+  # Add a Jobs link to the admin sidebar nav.
+  - file: web/src/routes/(admin)/+layout.svelte
+    anchor: "<!-- Per-entity links land here as you run `ix add entity --frontend`. -->"
+    insert: |
+      <a class="rounded px-2 py-1 hover:bg-slate-200" href="/jobs">Jobs</a>
+
+hooks:
+  post_add:
+    - "go mod tidy"
+    - "echo 'Jobs admin added. Mount the API in server.New: r.Mount(\"/admin/jobs\", jobsadmin.Handler(jobInspector)) — see the comment at the wire-services anchor in cmd/api/main.go. The dashboard is at /jobs in the admin (proxy /admin to the API in dev).'"

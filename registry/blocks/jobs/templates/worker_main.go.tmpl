@@ -1,0 +1,55 @@
+// Command worker is the {{.Module}} background-task processor.
+//
+// Owned by the jobs block; written once, then yours to extend. It runs the
+// Asynq worker server and (when JOBS_SCHEDULER=1) the cron scheduler in the
+// same process, both stopping on SIGINT/SIGTERM. Register your task handlers in
+// handlers.go (RegisterHandlers) and your recurring schedules in
+// RegisterSchedules; this file only wires the lifecycle.
+//
+// Scale workers horizontally by running more replicas — but keep exactly ONE
+// process with JOBS_SCHEDULER=1, or recurring tasks get enqueued multiple
+// times. The helm jobs subchart sets this up.
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
+
+	"{{.Module}}/internal/jobs"
+)
+
+func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	srv, err := jobs.NewServer()
+	if err != nil {
+		log.Fatalf("jobs: new server: %v", err)
+	}
+	RegisterHandlers(srv)
+
+	var wg sync.WaitGroup
+	if err := srv.Start(ctx, &wg); err != nil {
+		log.Fatalf("jobs: start server: %v", err)
+	}
+
+	if os.Getenv("JOBS_SCHEDULER") == "1" {
+		sched, err := jobs.NewScheduler()
+		if err != nil {
+			log.Fatalf("jobs: new scheduler: %v", err)
+		}
+		RegisterSchedules(sched)
+		if err := sched.Start(ctx, &wg); err != nil {
+			log.Fatalf("jobs: start scheduler: %v", err)
+		}
+	}
+
+	log.Printf("%s worker running", "{{.Module}}")
+	<-ctx.Done()
+	wg.Wait()
+	log.Printf("%s worker stopped", "{{.Module}}")
+}

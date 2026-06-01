@@ -1,0 +1,42 @@
+// Handler and schedule registration for the {{.Module}} worker.
+//
+// Owned by the jobs block; written once, then yours. Add a task type as a
+// const, a handler method, and a line in RegisterHandlers. Add recurring tasks
+// in RegisterSchedules. The example "example:ping" handler is safe to delete.
+package main
+
+import (
+	"context"
+	"log"
+
+	"{{.Module}}/internal/jobs"
+)
+
+// Task type names. Keep these stable: they route enqueued tasks to handlers and
+// are persisted in Redis, so renaming one strands in-flight tasks.
+const (
+	TaskExamplePing = "example:ping"
+)
+
+// RegisterHandlers wires every task type to its handler. A type without a
+// handler here is retried then archived.
+func RegisterHandlers(srv *jobs.Server) {
+	srv.Handle(TaskExamplePing, handlePing)
+}
+
+// RegisterSchedules wires recurring tasks. Runs only in the scheduler process
+// (JOBS_SCHEDULER=1). Cron specs use 5-field cron or @every/@daily macros.
+func RegisterSchedules(sched *jobs.Scheduler) {
+	// Example: enqueue a ping every minute. Delete in real projects.
+	if _, err := sched.Register("@every 1m", jobs.NewTask(TaskExamplePing, nil)); err != nil {
+		log.Printf("jobs: register ping schedule: %v", err)
+	}
+}
+
+// handlePing is the example handler. Handlers MUST be idempotent: Asynq may
+// deliver the same task more than once. Decode the payload, do the work, return
+// nil on success or an error to trigger a retry.
+func handlePing(ctx context.Context, task *jobs.Task) error {
+	log.Printf("jobs: ping (payload=%q)", task.Payload())
+	return nil
+}
