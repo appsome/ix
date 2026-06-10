@@ -5,14 +5,15 @@
 #   queries/<name>.sql            sqlc CRUD queries
 #   datastore/pkg/<name>/         repository wrapper over the sqlc Queries
 #   api/schema/<name>.graphqls    GraphQL type + queries/mutations
-#   [web/...]                     SvelteKit list/show pages (with --frontend)
+#   [web/...]                     SvelteKit list / show-edit / new routes +
+#                                 Houdini +page.gql documents (with --frontend)
 #
 # It deliberately does NOT write resolver .go files: `ix generate` runs gqlgen,
 # which scaffolds the resolver stubs in internal/api/resolver — fill those in,
 # reaching the DB through the generated repository. Generated files are
 # render-once (yours to edit); re-running leaves existing files untouched.
 name: entity
-version: 0.1.0
+version: 0.2.0
 category: generator
 summary: "Scaffold a schema-first slice (queries + repository + graphqls [+ frontend])."
 
@@ -32,8 +33,11 @@ files:
   - { src: repository.go.tmpl,   dest: "internal/datastore/pkg/{{.Name}}/repository.go", once: true }
   - { src: schema.graphqls.tmpl, dest: "internal/api/schema/{{.Name}}.graphqls", once: true }
   - { src: list.svelte.tmpl,     dest: "web/src/routes/(admin)/{{.NamePlural}}/+page.svelte", when: Frontend, once: true }
+  - { src: list.gql.tmpl,        dest: "web/src/routes/(admin)/{{.NamePlural}}/+page.gql", when: Frontend, once: true }
   - { src: show.svelte.tmpl,     dest: "web/src/routes/(admin)/{{.NamePlural}}/[id]/+page.svelte", when: Frontend, once: true }
+  - { src: show.gql.tmpl,        dest: "web/src/routes/(admin)/{{.NamePlural}}/[id]/+page.gql", when: Frontend, once: true }
+  - { src: new.svelte.tmpl,      dest: "web/src/routes/(admin)/{{.NamePlural}}/new/+page.svelte", when: Frontend, once: true }
 
 hooks:
   post_add:
-    - "echo 'Next: add the {{.NamePlural}} table to internal/datastore/schema.sql, then: ix migrate new add_{{.NamePlural}} && ix generate'"
+    - "echo 'Next: add the {{.NamePlural}} table to internal/datastore/schema.sql, then: ix migrate new add_{{.NamePlural}} && ix generate (with --frontend pages, follow with: ix generate houdini)'"

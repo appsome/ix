@@ -225,8 +225,11 @@ func cmdList(ctx context.Context, args []string) error {
 	return nil
 }
 
-// cmdGenerate runs the codegen pipeline. With no arg it prefers the vendored
-// scripts/generate.sh, falling back to sqlc + gqlgen.
+// cmdGenerate runs the codegen pipeline. With no arg it runs `all`, preferring
+// the vendored scripts/generate.sh and falling back to sqlc + gqlgen
+// (+ houdini when the frontend exists). `atlas` is explicit-only — it diffs
+// schema.sql into a new migration, which needs the dev database running and is
+// not a no-op-on-rerun generator like the others.
 func cmdGenerate(ctx context.Context, args []string) error {
 	root, err := registry.FindProjectRoot(".")
 	if err != nil {
@@ -238,10 +241,18 @@ func cmdGenerate(ctx context.Context, args []string) error {
 	}
 
 	switch target {
+	case "atlas":
+		return run(root, "atlas", "migrate", "diff", "--env", "local")
 	case "sqlc":
 		return run(root, "sqlc", "generate")
 	case "gqlgen":
 		return run(root, "go", "run", "github.com/99designs/gqlgen", "generate")
+	case "houdini":
+		web, err := webDir(root)
+		if err != nil {
+			return err
+		}
+		return run(web, "npx", "houdini", "generate")
 	case "all":
 		if _, err := os.Stat(filepath.Join(root, "scripts/generate.sh")); err == nil {
 			return run(root, "bash", "scripts/generate.sh")
@@ -249,10 +260,30 @@ func cmdGenerate(ctx context.Context, args []string) error {
 		if err := run(root, "sqlc", "generate"); err != nil {
 			return err
 		}
-		return run(root, "go", "run", "github.com/99designs/gqlgen", "generate")
+		if err := run(root, "go", "run", "github.com/99designs/gqlgen", "generate"); err != nil {
+			return err
+		}
+		if web, err := webDir(root); err == nil {
+			return run(web, "npx", "houdini", "generate")
+		}
+		return nil
 	default:
-		return fmt.Errorf("generate: unknown target %q (want sqlc|gqlgen|all)", target)
+		return fmt.Errorf("generate: unknown target %q (want atlas|sqlc|gqlgen|houdini|all)", target)
 	}
+}
+
+// webDir resolves the project's frontend root (ix.yaml paths.web, default
+// "web") and verifies Houdini is configured there.
+func webDir(root string) (string, error) {
+	web := "web"
+	if m, err := registry.LoadManifest(root); err == nil && m.Paths.Web != "" {
+		web = m.Paths.Web
+	}
+	dir := filepath.Join(root, web)
+	if _, err := os.Stat(filepath.Join(dir, "houdini.config.js")); err != nil {
+		return "", fmt.Errorf("generate houdini: no houdini.config.js in %s/ — add the frontend first (`ix add admin-svelte`)", web)
+	}
+	return dir, nil
 }
 
 // cmdMigrate wraps Atlas: `ix migrate new <name>`.

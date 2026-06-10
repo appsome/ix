@@ -2,7 +2,7 @@
 # (schema.sql) and the configs that turn it into migrations + Go bindings.
 # PostGIS bits are conditional on {{.PostGIS}} from ix.yaml.
 name: core-schema
-version: 0.1.0
+version: 0.2.0
 category: codegen
 summary: "Schema-first pipeline: schema.sql + sqlc.yaml + atlas.hcl + generate scripts."
 

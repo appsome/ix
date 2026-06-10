@@ -88,7 +88,7 @@ ix/
 │       ├── block.yaml          #     block metadata (files, deps, vars, hooks)
 │       └── templates/          #     Go-template'd files materialized into projects
 ├── templates/project/          # base scaffold materialized by `ix init`
-├── examples/                   # end-to-end reference app (built in a later phase)
+├── examples/                   # end-to-end reference app (examples/reference)
 └── docs/                       # this design + per-area docs
 ```
 
@@ -292,23 +292,24 @@ The admin frontend is SvelteKit + shadcn-svelte.
 
 ```
 web/
+├── src/client.ts                # Houdini client + auth link (Bearer/X-Tenant)
 ├── src/lib/ix/                  # thin shared lib (vendored, owned)
-│   ├── gql/                     #   Houdini client + auth link (Bearer/X-Tenant)
-│   ├── data-table.svelte        #   sortable/filterable/paginated table
-│   ├── crud/                    #   list/show/form primitives over Houdini stores
-│   ├── auth/                    #   login, token store, route guard, tenant switcher
-│   └── components/ui/           #   shadcn-svelte components (you restyle these)
-├── src/routes/(admin)/<entity>/ # generated per-entity: +page (list), [id] (show/edit), new
-└── houdini.config.js            # points at the gqlgen schema (introspection or SDL)
+│   ├── DataTable.svelte         #   sortable table primitive
+│   ├── auth.ts                  #   login, token store, tenant switcher state
+│   └── utils.ts                 #   class helpers (shadcn-svelte style)
+├── src/routes/(admin)/<entity>/ # generated per-entity: +page (list) + +page.gql,
+│                                #   [id]/ (show/edit + mutations), new/ (create)
+└── houdini.config.js            # points at the gqlgen /query endpoint
 ```
 
 - **Houdini** chosen for GraphQL: native SvelteKit `load` integration, reactive
   stores, normalized cache, subscriptions (maps onto the existing gqlgen
   `Subscription` topics from `runtime/pubsub`).
-- **Generation**: `ix add entity --name foo --frontend` reads the GraphQL schema
-  and emits list/show/edit/create routes + Houdini `.gql` documents. Generated
-  pages are plain Svelte you own; the shared `lib/ix` keeps the boilerplate down
-  without putting a runtime abstraction in the request path.
+- **Generation**: `ix add entity --name foo --frontend` emits list/show-edit/
+  create routes + Houdini `+page.gql` documents matching the entity's generated
+  GraphQL schema; `ix generate houdini` then produces the typed client.
+  Generated pages are plain Svelte you own; the shared `lib/ix` keeps the
+  boilerplate down without putting a runtime abstraction in the request path.
 - Auth flow: JWT in an `Authorization: Bearer` header, optional `X-Tenant` for
   admins scoping to a Casbin domain.
 
@@ -358,8 +359,8 @@ did not change. If it did, downstream projects can never `go get -u` to the fix.
 The framework is built and verified end-to-end. The runtime module
 (`util`, `metric`, `pubsub`, `auth`, `authz`, `middleware`, `jobs`) builds and
 passes hermetic tests. The CLI does `init`, `add`, `list`, `generate`, `migrate`,
-`diff`, and `upgrade`, with the 3-way merge engine driving in-place block
-upgrades against the committed `.ix/baseline/`. The block catalogue in §8 is
+`diff`, `upgrade`, and `doctor`, with the 3-way merge engine driving in-place
+block upgrades against the committed `.ix/baseline/`. The block catalogue in §8 is
 fully addable, and a runnable [reference example](../examples/reference) ties the
 pipeline together (`schema.sql` → sqlc → a chi server consuming the runtime,
 behind JWT + Casbin-gated routes).

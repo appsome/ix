@@ -1,9 +1,9 @@
 {
-  "version": "0.1.6",
+  "version": "0.1.7",
   "blocks": [
-    { "name": "core-schema",    "version": "0.1.0", "category": "codegen",      "summary": "Schema-first pipeline: schema.sql + sqlc.yaml + atlas.hcl + generate scripts." },
+    { "name": "core-schema",    "version": "0.2.0", "category": "codegen",      "summary": "Schema-first pipeline: schema.sql + sqlc.yaml + atlas.hcl + generate scripts." },
     { "name": "graphql-server", "version": "0.1.0", "category": "codegen",      "summary": "chi HTTP server + gqlgen scaffold + connection/filter/pagination helpers." },
-    { "name": "entity",         "version": "0.1.0", "category": "generator",    "summary": "Scaffold a full vertical slice (queries + repo + graphqls + resolver [+ frontend])." },
+    { "name": "entity",         "version": "0.2.0", "category": "generator",    "summary": "Scaffold a full vertical slice (queries + repo + graphqls + resolver [+ frontend])." },
     { "name": "authz",          "version": "0.1.0", "category": "runtime-glue", "summary": "Casbin RBAC-with-domains authorization wired into chi + gqlgen." },
     { "name": "auth-jwt",       "version": "0.1.0", "category": "runtime-glue", "summary": "JWT issue/validate + claims, login flow, auth middleware." },
     { "name": "pubsub",         "version": "0.1.0", "category": "runtime-glue", "summary": "In-proc + Postgres LISTEN/NOTIFY broker backing GraphQL subscriptions." },

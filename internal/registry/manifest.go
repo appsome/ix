@@ -3,8 +3,8 @@
 // index (registry.json), and per-block metadata (block.yaml). See
 // docs/DESIGN.md §5 and §6.
 //
-// This file declares the types only — load/save/validate logic lands in
-// phase 3. They are the source of truth for the formats documented in DESIGN.
+// This file declares the manifest types only — load/save logic lives in io.go.
+// They are the source of truth for the formats documented in DESIGN.
 package registry
 
 // Manifest is ix.yaml — the human-edited project configuration.

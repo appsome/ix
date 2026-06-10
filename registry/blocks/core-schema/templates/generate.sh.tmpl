@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # Run all code generators in dependency order:
-#   1. sqlc   — Go db bindings from schema.sql + queries/
-#   2. gqlgen — GraphQL server scaffolding from the graphql schema
+#   1. sqlc    — Go db bindings from schema.sql + queries/
+#   2. gqlgen  — GraphQL server scaffolding from the graphql schema
+#   3. houdini — typed GraphQL client for web/ (skipped until the frontend exists)
+#
+# Atlas migrations are deliberately not here: diffing needs the dev database
+# and creates files — use `ix migrate new <name>` / scripts/makemigrations.sh.
 #
 # Re-running with unchanged inputs must be a no-op (no diff drift); CI relies on
 # that to detect missing checked-in generated files. Managed by ix (core-schema).
@@ -9,3 +13,7 @@ set -euo pipefail
 
 sqlc generate
 go run github.com/99designs/gqlgen generate
+
+if [ -f web/houdini.config.js ]; then
+  (cd web && npx houdini generate)
+fi
