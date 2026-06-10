@@ -15,6 +15,7 @@ type Repository interface {
 	Create{{.NamePascal}}(ctx context.Context, name string) (db.{{.NamePascal}}, error)
 	Get{{.NamePascal}}(ctx context.Context, id int64) (db.{{.NamePascal}}, error)
 	List{{.NamePascal}}(ctx context.Context, arg db.List{{.NamePascal}}Params) ([]db.{{.NamePascal}}, error)
+	Count{{.NamePascal}}(ctx context.Context) (int64, error)
 	Update{{.NamePascal}}(ctx context.Context, arg db.Update{{.NamePascal}}Params) (db.{{.NamePascal}}, error)
 	Delete{{.NamePascal}}(ctx context.Context, id int64) error
 }

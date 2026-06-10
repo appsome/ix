@@ -8,7 +8,11 @@ const config = {
     url: process.env.HOUDINI_API_URL || 'http://localhost:8080/query'
   },
   plugins: {
-    'houdini-svelte': {}
+    // static: the admin is an adapter-static SPA with no SvelteKit server, so
+    // Houdini must not inject its root +layout.server.js (it would make every
+    // page fetch /__data.json, which nothing answers in production — the Go
+    // server's index.html fallback comes back and the app dies on JSON.parse).
+    'houdini-svelte': { static: true }
   },
   scalars: {
     // gqlgen maps GraphQL ID to int64; treat it as a string client-side.

@@ -7,9 +7,15 @@ type {{.NamePascal}} {
   name: String!
 }
 
+"One page of the {{.NameCamel}} list plus the total row count for the pager."
+type {{.NamePascal}}Page {
+  items: [{{.NamePascal}}!]!
+  totalCount: Int!
+}
+
 extend type Query {
   {{.NameCamel}}(id: ID!): {{.NamePascal}}
-  {{.NamePluralCamel}}(first: Int = 50, offset: Int = 0): [{{.NamePascal}}!]!
+  {{.NamePluralCamel}}(first: Int = 50, offset: Int = 0): {{.NamePascal}}Page!
 }
 
 extend type Mutation {

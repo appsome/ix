@@ -11,6 +11,9 @@ SELECT * FROM {{.NamePlural}} WHERE id = $1;
 -- name: List{{.NamePascal}} :many
 SELECT * FROM {{.NamePlural}} ORDER BY id DESC LIMIT $1 OFFSET $2;
 
+-- name: Count{{.NamePascal}} :one
+SELECT count(*) FROM {{.NamePlural}};
+
 -- name: Update{{.NamePascal}} :one
 UPDATE {{.NamePlural}} SET name = $2 WHERE id = $1 RETURNING *;
 

@@ -1,5 +1,5 @@
 {
-  "version": "0.1.8",
+  "version": "0.1.9",
   "blocks": [
     { "name": "core-schema",    "version": "0.2.0", "category": "codegen",      "summary": "Schema-first pipeline: schema.sql + sqlc.yaml + atlas.hcl + generate scripts." },
     { "name": "graphql-server", "version": "0.2.0", "category": "codegen",      "summary": "chi HTTP server + gqlgen scaffold + connection/filter/pagination helpers." },
@@ -15,7 +15,7 @@
     { "name": "helm",           "version": "0.2.0", "category": "infra",        "summary": "Helm chart: api Deployment/Service/Ingress/HPA, migrations hook, optional jobs worker." },
     { "name": "ci-github",      "version": "0.1.0", "category": "infra",        "summary": "GitHub Actions: lint/test/build/security/deploy." },
     { "name": "ci-gitlab",      "version": "0.1.0", "category": "infra",        "summary": "GitLab CI: lint/test/build/security/deploy + pre-commit." },
-    { "name": "admin-svelte",   "version": "0.1.1", "category": "frontend",     "summary": "SvelteKit + shadcn-svelte + Houdini admin shell with generated CRUD." },
+    { "name": "admin-svelte",   "version": "0.1.2", "category": "frontend",     "summary": "SvelteKit + shadcn-svelte + Houdini admin shell with generated CRUD." },
     { "name": "jobs-admin",     "version": "0.1.1", "category": "frontend",     "summary": "Optional admin dashboard to monitor/manage Asynq jobs (queue stats, retry/archive/delete)." }
   ]
 }

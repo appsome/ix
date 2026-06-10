@@ -9,8 +9,18 @@
 
   export let data: PageData;
 
+  const pageSize = 50;
+  let page = 0;
+
   $: ({ {{.NamePluralPascal}}List } = data);
-  $: rows = ${{.NamePluralPascal}}List.data?.{{.NamePluralCamel}} ?? [];
+  $: rows = ${{.NamePluralPascal}}List.data?.{{.NamePluralCamel}}.items ?? [];
+  $: totalCount = ${{.NamePluralPascal}}List.data?.{{.NamePluralCamel}}.totalCount ?? 0;
+  $: pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
+
+  function goTo(p: number) {
+    page = p;
+    {{.NamePluralPascal}}List.fetch({ variables: { first: pageSize, offset: page * pageSize } });
+  }
 </script>
 
 <h1>{{.NamePluralPascal}}</h1>
@@ -27,4 +37,12 @@
       {/each}
     </tbody>
   </table>
+  <p>
+    {totalCount} record{totalCount === 1 ? '' : 's'}
+    {#if pageCount > 1}
+      · page {page + 1} of {pageCount}
+      <button disabled={page === 0} on:click={() => goTo(page - 1)}>‹ prev</button>
+      <button disabled={page >= pageCount - 1} on:click={() => goTo(page + 1)}>next ›</button>
+    {/if}
+  </p>
 {/if}
