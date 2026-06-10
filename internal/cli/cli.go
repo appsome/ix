@@ -1,19 +1,13 @@
 // Package cli implements the ix command surface (docs/DESIGN.md §4).
 //
-// This is the skeleton: the command router and signatures are defined so the
-// shape is agreed, but the bodies return errNotImplemented until the
-// corresponding build phase fills them in. A hand-rolled dispatch keeps the
-// dependency graph empty for now; a richer flag library can be adopted when the
-// commands gain real flags.
+// A hand-rolled dispatch keeps the dependency graph small; a richer flag
+// library can be adopted when the commands gain real flags.
 package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 )
-
-var errNotImplemented = errors.New("not implemented yet (skeleton)")
 
 type command struct {
 	name    string

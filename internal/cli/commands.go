@@ -5,9 +5,11 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/appsome/ix/internal/registry"
@@ -413,10 +415,169 @@ func indentDiff(diff string) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
+// cmdDoctor verifies the toolchain on PATH and, when run inside a project, the
+// ix-managed state: manifest↔lock consistency, working-tree drift against
+// ix.lock, runtime version constraints, and pending block updates
+// (docs/DESIGN.md §4 and §10). Exits non-zero when problems are found; local
+// edits to managed files are reported but are not problems — that is the
+// vendored model working as intended.
 func cmdDoctor(ctx context.Context, args []string) error {
-	// Phase 4: check toolchain presence/versions + verify ix.lock hashes match
-	// the working tree (drift) + runtime-version constraints.
-	return fmt.Errorf("doctor: %w", errNotImplemented)
+	problems := 0
+	fail := func(format string, args ...any) {
+		problems++
+		logf("  ✗ "+format, args...)
+	}
+
+	root, rootErr := registry.FindProjectRoot(".")
+	var manifest *registry.Manifest
+	if rootErr == nil {
+		var err error
+		if manifest, err = registry.LoadManifest(root); err != nil {
+			return err
+		}
+	}
+
+	// Toolchain. node only becomes required once the project has a frontend.
+	needNode := manifest != nil && manifest.Frontend.Framework != ""
+	logf("Toolchain:")
+	for _, t := range []struct {
+		name     string
+		args     []string
+		required bool
+		usedFor  string
+	}{
+		{"go", []string{"version"}, true, "building the project and running gqlgen"},
+		{"sqlc", []string{"version"}, true, "ix generate"},
+		{"atlas", []string{"version"}, true, "ix migrate and migration diffing"},
+		{"node", []string{"--version"}, needNode, "the frontend build"},
+		{"docker", []string{"--version"}, false, "the compose dev environment"},
+	} {
+		version, found := toolVersion(ctx, t.name, t.args...)
+		switch {
+		case found:
+			logf("  ✓ %-8s %s", t.name, version)
+		case t.required:
+			fail("%-8s not found on PATH — needed for %s", t.name, t.usedFor)
+		default:
+			logf("  - %-8s not found (optional — %s)", t.name, t.usedFor)
+		}
+	}
+
+	if rootErr != nil {
+		logf("\nNot inside an ix project (no %s) — project checks skipped.", registry.ManifestFile)
+		return doctorVerdict(problems)
+	}
+
+	lock, err := registry.LoadLock(root)
+	if err != nil {
+		return err
+	}
+	lockNames := slices.Sorted(maps.Keys(lock.Blocks))
+
+	// Manifest ↔ lock consistency.
+	logf("\nProject %s:", root)
+	for _, b := range manifest.Blocks {
+		if _, ok := lock.Blocks[b.Name]; !ok {
+			fail("%s listed in %s but missing from %s — re-run `ix add %s`",
+				b.Name, registry.ManifestFile, registry.LockFileName, b.Name)
+		}
+	}
+	for _, name := range lockNames {
+		if !slices.ContainsFunc(manifest.Blocks, func(b registry.InstalledBlock) bool { return b.Name == name }) {
+			fail("%s locked in %s but absent from %s — re-run `ix add %s` or remove the lock entry",
+				name, registry.LockFileName, registry.ManifestFile, name)
+		}
+	}
+
+	// Working-tree drift against the lock's pristine-render hashes.
+	clean, edited := 0, 0
+	for _, d := range registry.CheckDrift(root, lock) {
+		switch d.Status {
+		case registry.DriftClean:
+			clean++
+		case registry.DriftModified:
+			edited++
+			logf("  ~ %-40s local edits (%s) — `ix upgrade` will 3-way merge", d.Dest, d.Block)
+		case registry.DriftMissing:
+			fail("%-40s tracked by %s (%s) but missing from the tree", d.Dest, registry.LockFileName, d.Block)
+		case registry.DriftNoBaseline:
+			fail("%-40s has no .ix/baseline copy (%s) — upgrades cannot merge it", d.Dest, d.Block)
+		}
+	}
+	logf("  ✓ managed files: %d pristine, %d locally edited", clean, edited)
+
+	// Runtime constraint: go.mod must require at least the newest version any
+	// installed block needs (docs/DESIGN.md §10).
+	type runtimeReq struct{ version, by string }
+	reqs := map[string]runtimeReq{}
+	for _, name := range lockNames {
+		rt := lock.Blocks[name].Runtime
+		if rt == nil || rt.Version == "" {
+			continue
+		}
+		if r, ok := reqs[rt.Module]; !ok || registry.CompareVersions(rt.Version, r.version) > 0 {
+			reqs[rt.Module] = runtimeReq{rt.Version, name}
+		}
+	}
+	for _, module := range slices.Sorted(maps.Keys(reqs)) {
+		req := reqs[module]
+		have, replaced, err := registry.GoModRequire(root, module)
+		switch {
+		case err != nil:
+			fail("%v — %s requires %s %s", err, req.by, module, req.version)
+		case have == "":
+			fail("%s requires %s %s but go.mod does not require it — run `go get %s@%s`",
+				req.by, module, req.version, module, req.version)
+		case replaced:
+			logf("  - %s is `replace`d in go.mod — version check skipped", module)
+		case registry.CompareVersions(have, req.version) < 0:
+			fail("go.mod has %s %s but %s requires ≥ %s — run `go get %s@%s`",
+				module, have, req.by, req.version, module, req.version)
+		default:
+			logf("  ✓ runtime %s %s satisfies all installed blocks", module, have)
+		}
+	}
+
+	// Pending updates against this CLI's embedded registry.
+	updates := 0
+	for _, name := range lockNames {
+		b, err := registry.LoadBlock(name)
+		if err != nil {
+			continue // not in this CLI's registry (e.g. placeholder block)
+		}
+		if installed := lock.Blocks[name].Version; registry.CompareVersions(b.Version, installed) > 0 {
+			updates++
+			logf("  ↑ %-40s %s → %s available — `ix upgrade %s`", name, installed, b.Version, name)
+		}
+	}
+	if updates == 0 {
+		logf("  ✓ all installed blocks match the embedded registry (%s)", registryVersion())
+	}
+
+	return doctorVerdict(problems)
+}
+
+func doctorVerdict(problems int) error {
+	if problems == 0 {
+		logf("\n✓ No problems found.")
+		return nil
+	}
+	return fmt.Errorf("doctor: %d problem(s) found", problems)
+}
+
+// toolVersion reports whether name is on PATH and, if so, the first line of
+// its version output (best-effort: a tool that is present but fails the
+// version probe still counts as found).
+func toolVersion(ctx context.Context, name string, args ...string) (string, bool) {
+	if _, err := exec.LookPath(name); err != nil {
+		return "", false
+	}
+	out, err := exec.CommandContext(ctx, name, args...).Output()
+	if err != nil {
+		return "(version unknown)", true
+	}
+	line, _, _ := strings.Cut(strings.TrimSpace(string(out)), "\n")
+	return strings.TrimSpace(line), true
 }
 
 func cmdVersion(ctx context.Context, args []string) error {
