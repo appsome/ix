@@ -5,7 +5,7 @@
 # bodies contain brace sequences that must not pass through ix's Go-template
 # renderer. The per-entity list/show pages come from `ix add entity --frontend`.
 name: admin-svelte
-version: 0.1.0
+version: 0.1.1
 category: frontend
 summary: SvelteKit + shadcn-svelte + Houdini admin shell with auth, tenant switcher, data-table.
 

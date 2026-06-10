@@ -8,10 +8,11 @@
 # schedule registration, and a patch that constructs the enqueue Client in the
 # API's main() so resolvers can enqueue tasks.
 #
-# Requires Redis (the compose block ships one; helm exposes REDIS_* env). The
-# optional admin/monitoring UI is a separate block, jobs-admin.
+# Requires Redis (the compose block ships one; the helm block deploys the
+# worker via its `worker.*` values, REDIS_* included). The optional
+# admin/monitoring UI is a separate block, jobs-admin.
 name: jobs
-version: 0.1.0
+version: 0.1.1
 category: runtime-glue
 summary: Asynq (Redis) background task queue + worker binary; optional admin via jobs-admin.
 

@@ -275,7 +275,7 @@ block's `runtime.version` advances.
 | `admin-cli` | infra | user/role/policy management CLI. |
 | `docker` | infra | multi-service Dockerfiles + air hot-reload. |
 | `compose` | infra | docker-compose: postgres(+postgis), redis, services, migrations. |
-| `helm` | infra | Helm chart: Deployment/Service/Ingress/HPA + migrations hook. |
+| `helm` | infra | Helm chart: api Deployment/Service/Ingress/HPA + migrations hook + optional jobs-worker Deployment. |
 | `ci-github` | infra | GitHub Actions: lint/test/build. |
 | `ci-gitlab` | infra | GitLab CI: lint/test/build + pre-commit. |
 | `admin-svelte` | frontend | SvelteKit + shadcn-svelte + Houdini admin shell with generated CRUD. |

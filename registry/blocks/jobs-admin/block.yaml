@@ -11,7 +11,7 @@
 # page lives in). It does not embed asynqmon — the dashboard is a page you own,
 # consistent with the rest of the admin.
 name: jobs-admin
-version: 0.1.0
+version: 0.1.1
 category: frontend
 summary: Optional admin dashboard to monitor/manage Asynq jobs (queue stats, retry/archive/delete).
 
@@ -34,24 +34,20 @@ files:
   - { src: jobs.page.svelte,  dest: "web/src/routes/(admin)/jobs/+page.svelte", raw: true }
 
 patches:
-  # Construct an Inspector and mount the admin API on the chi router. This runs
-  # at the wire-services anchor (shutdownCtx in scope); the jobs block's own
-  # patch already imports internal/jobs. We mount on `srv`'s router via the
-  # router-mount anchor graphql-server ships; if absent, mount manually where
-  # you build the chi.Mux.
-  - file: cmd/api/main.go
-    anchor: "// ix:wire-services"
+  # Mount the admin API at the ix:routes anchor graphql-server ships inside
+  # server.New (r in scope). MustHandler builds its own Inspector from the
+  # REDIS_* env, so nothing needs threading through from main(). Projects
+  # scaffolded before graphql-server 0.2.0 lack the anchor — run
+  # `ix upgrade graphql-server`, then re-run `ix add jobs-admin` (idempotent)
+  # to apply the patch.
+  - file: internal/api/server/server.go
+    anchor: "// ix:routes"
     imports:
       - "{{.Module}}/internal/jobsadmin"
     insert: |
-      jobInspector, err := jobs.NewInspector()
-      if err != nil {
-      	log.Fatalf("jobs admin: %v", err)
-      }
-      defer func() { _ = jobInspector.Close() }()
-      // Mount the jobs admin API behind your admin auth, e.g. in server.New:
-      //   r.Mount("/admin/jobs", jobsadmin.Handler(jobInspector))
-      _ = jobsadmin.Handler(jobInspector)
+      // Jobs admin API for the /jobs dashboard. Wrap with your admin auth
+      // middleware, e.g. r.With(adminAuth).Mount(...).
+      r.Mount("/admin/jobs", jobsadmin.MustHandler())
   # Add a Jobs link to the admin sidebar nav.
   - file: web/src/routes/(admin)/+layout.svelte
     anchor: "<!-- Per-entity links land here as you run `ix add entity --frontend`. -->"
@@ -61,4 +57,4 @@ patches:
 hooks:
   post_add:
     - "go mod tidy"
-    - "echo 'Jobs admin added. Mount the API in server.New: r.Mount(\"/admin/jobs\", jobsadmin.Handler(jobInspector)) — see the comment at the wire-services anchor in cmd/api/main.go. The dashboard is at /jobs in the admin (proxy /admin to the API in dev).'"
+    - "echo 'Jobs admin added: API mounted at /admin/jobs (internal/api/server/server.go — wrap it with your admin auth middleware), dashboard at /jobs. Dev proxy for /admin ships with admin-svelte. If the mount patch reported a missing anchor, run `ix upgrade graphql-server admin-svelte`, then `ix add jobs-admin` again.'"

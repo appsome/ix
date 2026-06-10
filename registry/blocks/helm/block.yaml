@@ -1,12 +1,13 @@
-# Helm chart for the {{.App}} api service (docs/DESIGN.md §8). A single-service
-# chart (Deployment + Service + Ingress + HPA). Chart.yaml/values.yaml are
-# ix-rendered for the app name; the
-# template bodies are `raw` because they are themselves Helm (Go) templates and
-# must not pass through ix's renderer.
+# Helm chart for the {{.App}} service (docs/DESIGN.md §8): api Deployment +
+# Service + Ingress + HPA, an Atlas migrations pre-install/upgrade hook, and an
+# optional jobs-worker Deployment (values: worker.enabled, off by default until
+# the cmd/worker image exists). Chart.yaml/values.yaml are ix-rendered for the
+# app name; the template bodies are `raw` because they are themselves Helm (Go)
+# templates and must not pass through ix's renderer.
 name: helm
-version: 0.1.0
+version: 0.2.0
 category: infra
-summary: Helm chart for the api service — Deployment, Service, Ingress, HPA.
+summary: "Helm chart: api Deployment/Service/Ingress/HPA, migrations hook, optional jobs worker."
 
 requires:
   - docker
@@ -19,6 +20,7 @@ files:
   - { src: values.yaml.tmpl,   dest: "charts/{{.App}}/values.yaml" }
   - { src: _helpers.tpl,       dest: "charts/{{.App}}/templates/_helpers.tpl",      raw: true }
   - { src: deployment.yaml,    dest: "charts/{{.App}}/templates/deployment.yaml",   raw: true }
+  - { src: worker-deployment.yaml, dest: "charts/{{.App}}/templates/worker-deployment.yaml", raw: true }
   - { src: service.yaml,       dest: "charts/{{.App}}/templates/service.yaml",      raw: true }
   - { src: ingress.yaml,       dest: "charts/{{.App}}/templates/ingress.yaml",      raw: true }
   - { src: hpa.yaml,           dest: "charts/{{.App}}/templates/hpa.yaml",          raw: true }

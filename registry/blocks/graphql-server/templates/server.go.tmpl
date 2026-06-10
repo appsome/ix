@@ -35,6 +35,10 @@ func New(database *sql.DB) *Server {
 		_, _ = w.Write([]byte("ok"))
 	})
 
+	// Blocks mount additional HTTP routes at the anchor below (r and database
+	// are in scope) — e.g. jobs-admin mounts its /admin/jobs API there.
+	// ix:routes
+
 	gql := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{
 		Resolvers: resolver.New(database),
 	}))

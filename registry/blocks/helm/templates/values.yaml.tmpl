@@ -16,6 +16,31 @@ migrations:
     repository: {{.App}}-migrations
     tag: latest
 
+# Background worker for the jobs block (`ix add jobs`). Flip `enabled` on once
+# the worker image exists (build ./cmd/worker; see the compose block's worker
+# service comment for the Dockerfile target). The worker shares dbSecret and
+# `env` with the api; point REDIS_URL or REDIS_ADDR at your Redis below.
+worker:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: {{.App}}-worker
+    tag: latest
+    pullPolicy: IfNotPresent
+  # Sets JOBS_SCHEDULER=1 so this deployment also enqueues recurring tasks.
+  # Keep replicaCount at 1 while true, or crons fire once per replica.
+  scheduler: true
+  # Worker-only env, merged over the shared `env` below.
+  env: {}
+  #  REDIS_ADDR: redis-master:6379
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
 # Database connection. In production point dbSecret at an existing Secret with
 # DB_HOST/DB_NAME/DB_USER/DB_PASS/DATABASE_URL keys.
 dbSecret: ""

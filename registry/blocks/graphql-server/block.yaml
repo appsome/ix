@@ -4,7 +4,7 @@
 # root. Intentionally runtime-free (chi + gqlgen + database/sql only) so the
 # core pipeline builds without the ix/runtime module; glue blocks add that.
 name: graphql-server
-version: 0.1.0
+version: 0.2.0
 category: codegen
 summary: chi HTTP server + gqlgen scaffold + connection/pagination helpers.
 

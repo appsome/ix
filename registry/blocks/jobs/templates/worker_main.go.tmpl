@@ -8,7 +8,7 @@
 //
 // Scale workers horizontally by running more replicas — but keep exactly ONE
 // process with JOBS_SCHEDULER=1, or recurring tasks get enqueued multiple
-// times. The helm jobs subchart sets this up.
+// times. The helm block's worker deployment sets this up (values: worker.*).
 package main
 
 import (

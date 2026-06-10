@@ -3,14 +3,14 @@
 // queue stats, paginated task lists by state, and per-task run/archive/delete
 // actions — that the admin-svelte jobs dashboard consumes.
 //
-// Mount it on the API's chi router behind your auth/authz middleware (the
-// jobs-admin block patches cmd/api/main.go to do this at the jobs admin
-// inspector). The routes live under a caller-chosen prefix, conventionally
-// /admin/jobs.
+// The jobs-admin block patches the API's router (the ix:routes anchor in
+// internal/api/server/server.go) to mount MustHandler at /admin/jobs. Wrap the
+// mount with your auth/authz middleware — the patch leaves a comment where.
 package jobsadmin
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -18,6 +18,19 @@ import (
 
 	"{{.Module}}/internal/jobs"
 )
+
+// MustHandler is Handler with an Inspector built from the environment
+// (REDIS_URL / REDIS_ADDR / REDIS_PASSWORD / REDIS_DB — the same vars the
+// worker reads). It panics when the Redis config cannot be parsed, surfacing
+// the problem at server construction rather than on the first request. The
+// Inspector lives for the process; there is nothing to close before exit.
+func MustHandler() http.Handler {
+	insp, err := jobs.NewInspector()
+	if err != nil {
+		panic(fmt.Sprintf("jobsadmin: inspector: %v", err))
+	}
+	return Handler(insp)
+}
 
 // Handler builds a chi router exposing the jobs admin API backed by insp. The
 // caller mounts it (e.g. r.Mount("/admin/jobs", jobsadmin.Handler(insp))) under
