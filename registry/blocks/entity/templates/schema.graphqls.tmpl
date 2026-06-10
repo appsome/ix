@@ -13,9 +13,20 @@ type {{.NamePascal}}Page {
   totalCount: Int!
 }
 
+"Sortable columns of the {{.NameCamel}} list; the resolver lowercases the value into the List query's order_by."
+enum {{.NamePascal}}OrderField {
+  ID
+  NAME
+}
+
 extend type Query {
   {{.NameCamel}}(id: ID!): {{.NamePascal}}
-  {{.NamePluralCamel}}(first: Int = 50, offset: Int = 0): {{.NamePascal}}Page!
+  {{.NamePluralCamel}}(
+    first: Int = 50
+    offset: Int = 0
+    orderBy: {{.NamePascal}}OrderField! = ID
+    orderDesc: Boolean! = true
+  ): {{.NamePascal}}Page!
 }
 
 extend type Mutation {

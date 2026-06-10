@@ -9,7 +9,16 @@ INSERT INTO {{.NamePlural}} (name) VALUES ($1) RETURNING *;
 SELECT * FROM {{.NamePlural}} WHERE id = $1;
 
 -- name: List{{.NamePascal}} :many
-SELECT * FROM {{.NamePlural}} ORDER BY id DESC LIMIT $1 OFFSET $2;
+-- Dynamic ORDER BY via the sqlc CASE pattern: order_by is the lowercase
+-- column name ('id', 'name'); unmatched CASEs are NULL and fall through to
+-- the id DESC tiebreaker. Extend the CASE list as you add sortable columns.
+SELECT * FROM {{.NamePlural}}
+ORDER BY
+  CASE WHEN @order_by::text = 'name' AND NOT @order_desc::boolean THEN name END ASC,
+  CASE WHEN @order_by::text = 'name' AND @order_desc::boolean THEN name END DESC,
+  CASE WHEN @order_by::text = 'id' AND NOT @order_desc::boolean THEN id END ASC,
+  id DESC
+LIMIT @page_limit OFFSET @page_offset;
 
 -- name: Count{{.NamePascal}} :one
 SELECT count(*) FROM {{.NamePlural}};

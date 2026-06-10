@@ -10,16 +10,44 @@
   export let data: PageData;
 
   const pageSize = 50;
+
+  type OrderField = 'ID' | 'NAME';
+
   let page = 0;
+  let orderBy: OrderField = 'ID';
+  let orderDesc = true;
 
   $: ({ {{.NamePluralPascal}}List } = data);
   $: rows = ${{.NamePluralPascal}}List.data?.{{.NamePluralCamel}}.items ?? [];
   $: totalCount = ${{.NamePluralPascal}}List.data?.{{.NamePluralCamel}}.totalCount ?? 0;
   $: pageCount = Math.max(1, Math.ceil(totalCount / pageSize));
 
+  function load() {
+    {{.NamePluralPascal}}List.fetch({
+      variables: { first: pageSize, offset: page * pageSize, orderBy, orderDesc }
+    });
+  }
+
   function goTo(p: number) {
     page = p;
-    {{.NamePluralPascal}}List.fetch({ variables: { first: pageSize, offset: page * pageSize } });
+    load();
+  }
+
+  function sortBy(field: OrderField) {
+    if (orderBy === field) {
+      orderDesc = !orderDesc;
+    } else {
+      orderBy = field;
+      orderDesc = false;
+    }
+    page = 0;
+    load();
+  }
+
+  // Takes orderBy/orderDesc as args so Svelte re-renders the headers on change.
+  function arrow(field: OrderField, by: OrderField, desc: boolean): string {
+    if (by !== field) return '';
+    return desc ? ' ▼' : ' ▲';
   }
 </script>
 
@@ -30,7 +58,10 @@
   <p>Loading…</p>
 {:else}
   <table>
-    <thead><tr><th>ID</th><th>Name</th></tr></thead>
+    <thead><tr>
+      <th style="cursor: pointer" on:click={() => sortBy('ID')}>ID{arrow('ID', orderBy, orderDesc)}</th>
+      <th style="cursor: pointer" on:click={() => sortBy('NAME')}>Name{arrow('NAME', orderBy, orderDesc)}</th>
+    </tr></thead>
     <tbody>
       {#each rows as row}
         <tr><td><a href="/{{.NamePlural}}/{row.id}">{row.id}</a></td><td>{row.name}</td></tr>

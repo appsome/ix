@@ -13,7 +13,7 @@
 # reaching the DB through the generated repository. Generated files are
 # render-once (yours to edit); re-running leaves existing files untouched.
 name: entity
-version: 0.2.1
+version: 0.2.2
 category: generator
 summary: "Scaffold a schema-first slice (queries + repository + graphqls [+ frontend])."
 

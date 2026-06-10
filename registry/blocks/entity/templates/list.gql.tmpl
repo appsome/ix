@@ -3,8 +3,13 @@
 # then run `ix generate houdini` to refresh the typed client. The variables
 # have defaults, so houdini generates the page load without a Variables
 # function; the page re-fetches with a new $offset to paginate.
-query {{.NamePluralPascal}}List($first: Int = 50, $offset: Int = 0) {
-  {{.NamePluralCamel}}(first: $first, offset: $offset) {
+query {{.NamePluralPascal}}List(
+  $first: Int = 50
+  $offset: Int = 0
+  $orderBy: {{.NamePascal}}OrderField! = ID
+  $orderDesc: Boolean! = true
+) {
+  {{.NamePluralCamel}}(first: $first, offset: $offset, orderBy: $orderBy, orderDesc: $orderDesc) {
     items {
       id
       name
