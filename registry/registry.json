@@ -5,7 +5,7 @@
     { "name": "graphql-server", "version": "0.2.0", "category": "codegen",      "summary": "chi HTTP server + gqlgen scaffold + connection/filter/pagination helpers." },
     { "name": "entity",         "version": "0.2.2", "category": "generator",    "summary": "Scaffold a full vertical slice (queries + repo + graphqls + resolver [+ frontend])." },
     { "name": "authz",          "version": "0.1.0", "category": "runtime-glue", "summary": "Casbin RBAC-with-domains authorization wired into chi + gqlgen." },
-    { "name": "auth-jwt",       "version": "0.1.0", "category": "runtime-glue", "summary": "JWT issue/validate + claims, login flow, auth middleware." },
+    { "name": "auth-jwt",       "version": "0.1.1", "category": "runtime-glue", "summary": "JWT issue/validate + claims, login flow, auth middleware." },
     { "name": "pubsub",         "version": "0.1.0", "category": "runtime-glue", "summary": "In-proc + Postgres LISTEN/NOTIFY broker backing GraphQL subscriptions." },
     { "name": "metrics",        "version": "0.1.0", "category": "runtime-glue", "summary": "Prometheus metrics endpoint + coded error registry." },
     { "name": "jobs",           "version": "0.1.1", "category": "runtime-glue", "summary": "Asynq (Redis) background task queue + worker binary; optional admin via jobs-admin." },

@@ -12,7 +12,7 @@
 # GraphQL resolver as documented next steps (the graphql-server router is
 # private to server.New, so there is no anchor to auto-wire it).
 name: auth-jwt
-version: 0.1.0
+version: 0.1.1
 category: runtime-glue
 summary: JWT issue/validate + claims, login flow, auth middleware.
 

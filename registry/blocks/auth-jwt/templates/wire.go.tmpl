@@ -7,6 +7,7 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 	"os"
 
@@ -31,6 +32,51 @@ func AuthMiddleware(ts *TokenService) func(http.Handler) http.Handler {
 // GetClaims extracts the claims attached by AuthMiddleware, or false when the
 // request is unauthenticated.
 func GetClaims(r *http.Request) (*Claims, bool) { return runtimemw.GetClaims(r) }
+
+// OptionalAuthMiddleware attaches *Claims to the request context when a valid
+// bearer token is present and passes the request through untouched otherwise.
+// Use it on endpoints that mix public and authenticated operations — typically
+// the GraphQL endpoint, where the login mutation must work unauthenticated and
+// protected resolvers enforce via ClaimsFromContext.
+func OptionalAuthMiddleware(ts *TokenService) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if token, err := runtimemw.ExtractBearerToken(r); err == nil {
+				if claims, err := ts.ValidateToken(token); err == nil {
+					r = r.WithContext(context.WithValue(r.Context(), runtimemw.ClaimsContextKey, claims))
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// ClaimsFromContext extracts the claims attached by AuthMiddleware or
+// OptionalAuthMiddleware. This is the resolver-side counterpart of GetClaims:
+// gqlgen resolvers receive the request context, not the request.
+func ClaimsFromContext(ctx context.Context) (*Claims, bool) {
+	claims, ok := ctx.Value(runtimemw.ClaimsContextKey).(*Claims)
+	return claims, ok
+}
+
+// RequireRole returns the claims when the context carries an authenticated
+// user whose role is one of the allowed set; otherwise it returns false. The
+// zero-length allowed set accepts any authenticated user.
+func RequireRole(ctx context.Context, allowed ...Role) (*Claims, bool) {
+	claims, ok := ClaimsFromContext(ctx)
+	if !ok || claims == nil {
+		return nil, false
+	}
+	if len(allowed) == 0 {
+		return claims, true
+	}
+	for _, role := range allowed {
+		if claims.Role == role {
+			return claims, true
+		}
+	}
+	return nil, false
+}
 
 // Re-export the runtime types the rest of {{.Module}} references, keeping the
 // swap point local if the runtime API shifts.
