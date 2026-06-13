@@ -75,6 +75,7 @@ func Install(root string, m *Manifest, lock *Lockfile, b *Block, opts InstallOpt
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", b.Name, err)
 		}
+		dest = destPath(m, dest)
 		absDest := filepath.Join(root, dest)
 
 		if _, statErr := os.Stat(absDest); statErr == nil {
@@ -108,6 +109,7 @@ func Install(root string, m *Manifest, lock *Lockfile, b *Block, opts InstallOpt
 
 	// Patches inject into files owned by other blocks at named anchors.
 	for _, p := range b.Patches {
+		p.File = destPath(m, p.File)
 		applied, err := applyPatch(root, p, vars)
 		if err != nil {
 			opts.Logf("  ! patch %s: %v", p.File, err)

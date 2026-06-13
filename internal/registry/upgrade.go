@@ -90,6 +90,7 @@ func Upgrade(root string, m *Manifest, lock *Lockfile, b *Block, opts UpgradeOpt
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", b.Name, err)
 		}
+		dest = destPath(m, dest)
 		if f.Once || !managed {
 			continue // render-once / unmanaged: never touched by upgrade
 		}
@@ -171,6 +172,7 @@ func Upgrade(root string, m *Manifest, lock *Lockfile, b *Block, opts UpgradeOpt
 	if !opts.DryRun {
 		// Re-apply patches (idempotent) in case the new version added any.
 		for _, p := range b.Patches {
+			p.File = destPath(m, p.File)
 			if _, err := applyPatch(root, p, vars); err != nil {
 				opts.Logf("  ! patch %s: %v", p.File, err)
 			}
