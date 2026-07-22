@@ -43,12 +43,20 @@ const (
 // are optional tenant-scoping claims consumed by the authz layer; they are
 // omitted from the token when empty (omitempty) and the authz tenant resolver
 // treats their absence as "fall back to the admin-only '*' domain".
+//
+// ActorID is the user acting as UserID, when the token was issued to one user
+// on another's behalf (an impersonation): the token is UserID's in every
+// check, and ActorID says who is behind it, for the audit and for the project
+// to end such sessions. It is omitted when zero, so a token without it, issued
+// before it existed, reads as no actor. It is not RFC 8693's "act" claim,
+// which is an object.
 type Claims struct {
 	UserID      int64  `json:"user_id"`
 	Email       string `json:"email"`
 	Role        Role   `json:"role"`
 	PartyID     string `json:"party_id,omitempty"`
 	CountryCode string `json:"country_code,omitempty"`
+	ActorID     int64  `json:"actor_id,omitempty"`
 	jwt.RegisteredClaims
 }
 
