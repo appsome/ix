@@ -1,7 +1,7 @@
 # Container build + dev hot-reload (docs/DESIGN.md §8). A multi-stage Dockerfile
 # and air config, templatized to the project's module + app name.
 name: docker
-version: 0.1.0
+version: 0.1.1
 category: infra
 summary: Multi-stage API Dockerfile, atlas migrations image, .dockerignore, air hot-reload.
 

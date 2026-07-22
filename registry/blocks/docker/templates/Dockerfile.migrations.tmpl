@@ -1,9 +1,13 @@
 # Applies the Atlas migration history for {{.App}} against $DATABASE_URL, then
 # exits. Run once on deploy (a Helm hook / compose one-shot service).
-FROM arigaio/atlas:latest
+#
+# The -alpine variant ships a shell; the default (distroless) image does not,
+# so exec-form ENTRYPOINT could neither find `atlas` on $PATH nor expand
+# ${DATABASE_URL}. The binary lives at /atlas in both variants.
+FROM arigaio/atlas:latest-alpine
 
 WORKDIR /migrations
 COPY migrations ./
 
 # DATABASE_URL e.g. postgres://user:pass@host:5432/db?sslmode=disable
-ENTRYPOINT ["atlas", "migrate", "apply", "--dir", "file:///migrations", "--url", "${DATABASE_URL}"]
+ENTRYPOINT ["/bin/sh", "-c", "exec /atlas migrate apply --dir file:///migrations --url \"$DATABASE_URL\""]

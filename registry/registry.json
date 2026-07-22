@@ -1,5 +1,5 @@
 {
-  "version": "0.1.9",
+  "version": "0.1.10",
   "blocks": [
     { "name": "core-schema",    "version": "0.2.0", "category": "codegen",      "summary": "Schema-first pipeline: schema.sql + sqlc.yaml + atlas.hcl + generate scripts." },
     { "name": "graphql-server", "version": "0.2.0", "category": "codegen",      "summary": "chi HTTP server + gqlgen scaffold + connection/filter/pagination helpers." },
@@ -10,7 +10,7 @@
     { "name": "metrics",        "version": "0.1.0", "category": "runtime-glue", "summary": "Prometheus metrics endpoint + coded error registry." },
     { "name": "jobs",           "version": "0.1.1", "category": "runtime-glue", "summary": "Asynq (Redis) background task queue + worker binary; optional admin via jobs-admin." },
     { "name": "admin-cli",      "version": "0.1.0", "category": "infra",        "summary": "CLI for user/role/policy management." },
-    { "name": "docker",         "version": "0.1.0", "category": "infra",        "summary": "Multi-service Dockerfiles + dev hot-reload (air)." },
+    { "name": "docker",         "version": "0.1.1", "category": "infra",        "summary": "Multi-service Dockerfiles + dev hot-reload (air)." },
     { "name": "compose",        "version": "0.1.1", "category": "infra",        "summary": "docker-compose: postgres(+postgis), redis, services, migrations." },
     { "name": "helm",           "version": "0.2.0", "category": "infra",        "summary": "Helm chart: api Deployment/Service/Ingress/HPA, migrations hook, optional jobs worker." },
     { "name": "ci-github",      "version": "0.1.0", "category": "infra",        "summary": "GitHub Actions: lint/test/build/security/deploy." },
