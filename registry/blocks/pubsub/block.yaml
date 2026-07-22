@@ -1,21 +1,21 @@
 # Runtime-glue block (docs/DESIGN.md §6).
 #
-# The in-process + Postgres LISTEN/NOTIFY broker that backs gqlgen GraphQL
-# subscriptions is imported from github.com/appsome/ix/runtime/pubsub. This
-# block vendors only the project glue: a local pubsub package that picks the
-# right broker (Postgres when a DSN is set, in-process otherwise), re-exports
-# the Broker surface, and constructs it from main().
+# The in-process, Postgres LISTEN/NOTIFY and Redis brokers that back gqlgen
+# GraphQL subscriptions are imported from github.com/appsome/ix/runtime/pubsub.
+# This block vendors only the project glue: a local pubsub package that picks
+# the broker (Redis when a URL is set, Postgres when a DSN is set, in-process
+# otherwise), re-exports the Broker surface, and constructs it from main().
 name: pubsub
-version: 0.1.0
+version: 0.2.0
 category: runtime-glue
-summary: In-proc + Postgres LISTEN/NOTIFY broker backing GraphQL subscriptions.
+summary: In-proc, Postgres LISTEN/NOTIFY or Redis broker backing GraphQL subscriptions.
 
 requires:
   - graphql-server
 
 runtime:
   module: github.com/appsome/ix/runtime
-  version: v0.1.0
+  version: v0.3.0
   packages: [pubsub]
 
 vars:
@@ -28,15 +28,16 @@ files:
 patches:
   # Construct the broker at the wire-services anchor graphql-server ships in
   # cmd/api/main.go. The anchor contract provides shutdownCtx and dsn in scope.
-  # A Postgres broker is selected because dsn is non-empty; pass the channels
-  # your subscriptions publish on. Thread `broker` into resolver.New (see the
-  # block's next-steps) to back Subscription resolvers.
+  # A Postgres broker is selected because dsn is non-empty; set RedisURL to
+  # carry events through Redis instead, or pass the channels your
+  # subscriptions publish on for Postgres. Thread `broker` into resolver.New
+  # (see the block's next-steps) to back Subscription resolvers.
   - file: cmd/api/main.go
     anchor: "// ix:wire-services"
     imports:
       - "{{.Module}}/internal/pubsub"
     insert: |
-      broker, err := pubsub.NewBroker(shutdownCtx, dsn)
+      broker, err := pubsub.New(shutdownCtx, pubsub.Options{DSN: dsn})
       if err != nil {
       	log.Fatalf("pubsub: %v", err)
       }
@@ -46,4 +47,4 @@ patches:
 hooks:
   post_add:
     - "go mod tidy"
-    - "echo 'Next: thread broker into resolver.New, then back your Subscription resolvers with broker.Subscribe(ctx, topic). Pass the topics you publish on as extra args to pubsub.NewBroker to enable cross-process NOTIFY.'"
+    - "echo 'Next: thread broker into resolver.New, then back your Subscription resolvers with broker.Subscribe(ctx, topic). For cross-process delivery set pubsub.Options.RedisURL (Redis), or Options.Channels to the topics you publish on (Postgres NOTIFY).'"
