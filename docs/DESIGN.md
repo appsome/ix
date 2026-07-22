@@ -79,7 +79,7 @@ ix/
 │   ├── authz/                  #   Casbin RBAC-with-domains + psql watcher
 │   ├── auth/                   #   JWT issue/validate, claims
 │   ├── middleware/             #   chi auth/authz/audit middleware
-│   ├── pubsub/                 #   in-proc broker + Postgres LISTEN/NOTIFY driver
+│   ├── pubsub/                 #   in-proc broker + Postgres NOTIFY and Redis drivers
 │   ├── metric/                 #   Prometheus helpers + error registry
 │   └── util/                   #   env, sql null helpers, parse, rand, password
 ├── registry/                   # vendorable blocks (shadcn-style registry)
@@ -268,7 +268,7 @@ block's `runtime.version` advances.
 | `entity` (generator) | generator | `ix add entity --name foo` scaffolds a full vertical slice (queries + repository + graphqls + resolver, optionally frontend). |
 | `authz` | runtime-glue | Casbin model + seed + watcher wiring; logic in `runtime/authz`. |
 | `auth-jwt` | runtime-glue | JWT issue/validate + claims; logic in `runtime/auth`. |
-| `pubsub` | runtime-glue | in-proc + Postgres NOTIFY broker; logic in `runtime/pubsub`. |
+| `pubsub` | runtime-glue | in-proc, Postgres NOTIFY or Redis broker; logic in `runtime/pubsub`. |
 | `metrics` | runtime-glue | Prometheus endpoint + error registry; logic in `runtime/metric`. |
 | `jobs` | runtime-glue | Asynq (Redis) background task queue + worker binary; logic in `runtime/jobs`. |
 | `jobs-admin` | frontend | Optional dashboard to monitor/manage Asynq jobs. |

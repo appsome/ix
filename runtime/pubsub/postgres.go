@@ -83,7 +83,8 @@ func (b *PostgresBroker) run(ctx context.Context) {
 				// re-subscribing to channels we already registered.
 				continue
 			}
-			_ = b.local.Publish(ctx, n.Channel, []byte(n.Extra))
+			received.WithLabelValues(n.Channel).Inc()
+			b.local.deliver(n.Channel, []byte(n.Extra))
 		case <-time.After(90 * time.Second):
 			// Periodic ping keeps the TCP connection alive across NAT
 			// timeouts. Best-effort — pq.Listener reconnects on failure.
@@ -114,6 +115,7 @@ func (b *PostgresBroker) Publish(ctx context.Context, topic string, payload []by
 	if _, err := conn.ExecContext(ctx, "SELECT pg_notify($1, $2)", topic, string(payload)); err != nil {
 		return fmt.Errorf("pubsub: pg_notify %s: %w", topic, err)
 	}
+	published.WithLabelValues(topic).Inc()
 	return nil
 }
 

@@ -1,12 +1,12 @@
-// Package pubsub provides an in-process publish/subscribe broker plus an
-// optional Postgres LISTEN/NOTIFY driver. It backs gqlgen GraphQL
-// subscriptions.
+// Package pubsub provides an in-process publish/subscribe broker plus
+// optional Postgres LISTEN/NOTIFY and Redis drivers. It backs gqlgen GraphQL
+// subscriptions and lets sibling processes reach each other's subscribers.
 //
 // Callers Publish a payload to a topic and Subscribe to receive a fan-out copy
 // of every payload published on that topic until the supplied context is
 // cancelled. The broker is goroutine-safe; a slow subscriber cannot block
 // others — payloads destined for a full subscriber channel are dropped after a
-// non-blocking attempt.
+// non-blocking attempt and counted (pubsub_dropped_total).
 //
 // No domain-specific topic constants are defined here: topics are plain strings
 // the project owns.
@@ -19,8 +19,9 @@ import (
 )
 
 // Broker is the surface a Subscription resolver depends on. The in-process
-// implementation is the default; PostgresBroker composes it with a LISTEN
-// goroutine so publishers in sibling processes reach subscribers via NOTIFY.
+// implementation is the default; PostgresBroker and RedisBroker compose it
+// with a listening goroutine so publishers in sibling processes reach
+// subscribers via NOTIFY or Redis PUBLISH.
 type Broker interface {
 	// Publish fans payload out to every active subscriber on topic.
 	Publish(ctx context.Context, topic string, payload []byte) error
@@ -70,7 +71,18 @@ func (b *InProcessBroker) Publish(ctx context.Context, topic string, payload []b
 		default:
 		}
 	}
+	published.WithLabelValues(topic).Inc()
+	b.deliver(topic, payload)
+	return nil
+}
 
+// deliver hands payload to every local subscriber on topic: Publish's fan-out,
+// and the path a payload from Redis or Postgres takes, which is counted as
+// received rather than published.
+func (b *InProcessBroker) deliver(topic string, payload []byte) {
+	if b.closed.Load() {
+		return
+	}
 	b.mu.RLock()
 	subs := b.subscribers[topic]
 	// Snapshot the subscriber set so we can release the read lock before
@@ -86,10 +98,11 @@ func (b *InProcessBroker) Publish(ctx context.Context, topic string, payload []b
 		select {
 		case s.ch <- payload:
 		default:
-			// Drop for this subscriber rather than blocking publishers.
+			// Drop for this subscriber rather than blocking publishers,
+			// counted so a subscriber that falls behind is visible.
+			dropped.WithLabelValues(topic).Inc()
 		}
 	}
-	return nil
 }
 
 // Subscribe registers a new subscriber on topic and returns its receive
